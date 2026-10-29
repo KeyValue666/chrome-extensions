@@ -1,0 +1,78 @@
+# ---------- 依赖 ----------
+node_modules/
+.pnpm-store/
+.yarn/
+
+# ---------- 构建产物 ----------
+dist/
+build/
+out/
+release/
+*.zip
+*.crx
+*.pem
+*.vsix
+.vite/
+.turbo/
+.eslintcache
+*.tsbuildinfo
+
+# ---------- 测试与覆盖率 ----------
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+__screenshots__/
+
+# ---------- 环境变量与本地配置 ----------
+.env
+.env.*
+!.env.example
+*.local
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.idea/
+*.iml
+*.suo
+
+# ---------- 日志与临时文件 ----------
+*.log
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+logs/
+tmp/
+temp/
+*.tmp
+*.swp
+*~
+
+# ---------- 本地测试数据与浏览器调试产物 ----------
+.local-data/
+.fixtures-local/
+.user-data/
+.user-data-dir/
+chrome-profile/
+test-profile/
+*.har
+cookies.txt
+*.sqlite
+*.sqlite3
+
+# ---------- 系统文件 ----------
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ---------- 敏感凭据（双重保险，正常不应出现） ----------
+*.keystore
+*.jks
+secrets/
+.workbuddy/

@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+coverage/
+test-results/
+playwright-report/
+pnpm-lock.yaml
+
+# Markdown 由人工维护，交给 Prettier 会破坏中文排版与表格可读性
+*.md
