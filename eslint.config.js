@@ -16,6 +16,7 @@ export default tseslint.config(
       '**/playwright-report/**',
       '**/.wxt/**',
       '**/.workbuddy/**',
+      '**/.preview/**',
       '.idea/**',
     ],
   },
@@ -55,7 +56,8 @@ export default tseslint.config(
     // 构建脚本、配置文件运行在 Node.js 环境
     files: [
       '**/*.config.{js,mjs,cjs,ts,mts}',
-      'scripts/**/*.{js,mjs,ts}',
+      '**/scripts/**/*.{js,mjs,ts}',
+      '**/tools/**/*.{js,mjs,ts}',
       '**/vite.config.{ts,mts,js,mjs}',
     ],
     languageOptions: {
@@ -65,7 +67,7 @@ export default tseslint.config(
 
   {
     // 命令行脚本需要直接向终端输出
-    files: ['scripts/**/*.{js,mjs,ts}'],
+    files: ['**/scripts/**/*.{js,mjs,ts}', '**/tools/**/*.{js,mjs,ts}'],
     rules: {
       'no-console': 'off',
     },

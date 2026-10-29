@@ -1,0 +1,853 @@
+/* ==========================================================================
+   快捷方式区
+   ========================================================================== */
+
+.shortcuts-area {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 网格上方不再放「全部 / 新增」标题行，筛选交给左侧 Dock，
+   新增加入口是网格末尾的虚线图标；chip-button 样式保留给弹窗复用 */
+
+.chip-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background var(--dur-1) ease,
+    color var(--dur-1) ease,
+    border-color var(--dur-1) ease,
+    transform var(--dur-1) var(--ease-out);
+}
+
+.chip-button:hover {
+  border-color: var(--stroke-strong);
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.chip-button:active {
+  transform: scale(0.97);
+}
+
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+  gap: 2px;
+  align-items: start;
+}
+
+.shortcut {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 13px 6px 11px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  cursor: pointer;
+}
+
+/* 悬停不再铺一整块白底，只有图标抬起 + 投影加深，视觉更干净 */
+.shortcut:hover .shortcut-icon {
+  background: var(--surface-active);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.26);
+  transform: translateY(-4px) scale(1.06);
+}
+
+.shortcut:active .shortcut-icon {
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.2);
+  transform: translateY(-1px) scale(1.01);
+}
+
+.shortcut.is-dragging {
+  opacity: 0.4;
+}
+
+.shortcut.is-dragging .shortcut-icon {
+  transform: scale(0.94);
+}
+
+.shortcut-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  border: 1px solid var(--stroke);
+  border-radius: 16px;
+  background: var(--surface-hover);
+  box-shadow: 0 5px 14px rgba(0, 0, 0, 0.14);
+  transition:
+    transform 320ms var(--ease-spring),
+    background 240ms ease,
+    box-shadow 260ms ease;
+}
+
+.shortcut-letter {
+  color: var(--text-2);
+  font-size: 19px;
+  font-weight: 560;
+  letter-spacing: -0.02em;
+}
+
+.shortcut-favicon {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity var(--dur-2) ease;
+}
+
+.shortcut-icon.is-loaded .shortcut-favicon {
+  opacity: 1;
+}
+
+.shortcut-icon.is-loaded .shortcut-letter {
+  opacity: 0;
+}
+
+.shortcut-title {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 450;
+  line-height: 1.35;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--dur-1) ease;
+}
+
+.shortcut:hover .shortcut-title {
+  color: var(--text);
+}
+
+/* ---------- 内置应用图标：待办 / 便签 ---------- */
+
+.shortcut-app .app-icon {
+  border: 0;
+  color: #fff;
+  background: linear-gradient(150deg, #7c9bff, #6a5bff 58%, #8f57f0);
+  box-shadow:
+    0 8px 22px rgba(106, 91, 255, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.shortcut-app-note .app-icon {
+  background: linear-gradient(150deg, #ffc46b, #ff8a5b 58%, #ff6a72);
+  box-shadow:
+    0 8px 22px rgba(255, 122, 90, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.shortcut-app:hover .app-icon {
+  box-shadow:
+    0 16px 32px rgba(106, 91, 255, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.34);
+}
+
+.shortcut-app-note:hover .app-icon {
+  box-shadow:
+    0 16px 32px rgba(255, 122, 90, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.36);
+}
+
+/* 未完成数：贴在图标右上角，跟随图标一起缩放 */
+.app-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ff453a;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 3px 8px rgba(255, 69, 58, 0.42);
+}
+
+/* ---------- 添加图标 ---------- */
+
+.shortcut-add {
+  color: var(--text-3);
+}
+
+.shortcut-add .shortcut-icon,
+.shortcut-icon-add {
+  border-style: dashed;
+  border-color: var(--stroke-strong);
+  background: none;
+  box-shadow: none;
+}
+
+.shortcut-add:hover .shortcut-icon {
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.shortcut-add .shortcut-title {
+  color: var(--text-3);
+}
+
+/* 入场：--i 由 JS 写入，逐项错开 34ms，超过 14 项后不再累加延迟 */
+.is-entering .shortcut {
+  animation: tile-in var(--dur-3) var(--ease-out) both;
+  animation-delay: calc(var(--i, 0) * 34ms);
+}
+
+.is-entering .shortcut-add {
+  animation: tile-in var(--dur-3) var(--ease-out) both;
+  animation-delay: 0ms;
+}
+
+@keyframes tile-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   iOS 式编辑模式：图标抖动 + 删除/编辑角标
+   ========================================================================== */
+
+@media (prefers-reduced-motion: no-preference) {
+  .shortcut-grid.is-editing .shortcut-icon {
+    animation: jiggle 320ms ease-in-out infinite alternate;
+    /* 负延迟让相邻图标错峰，避免整齐划一地晃 */
+    animation-delay: calc(var(--i, 0) * -53ms);
+  }
+}
+
+@keyframes jiggle {
+  from {
+    transform: rotate(-1.8deg);
+  }
+  to {
+    transform: rotate(1.8deg);
+  }
+}
+
+/* 编辑态关掉悬停上浮，避免与抖动 transform 打架 */
+.shortcut-grid.is-editing .shortcut:hover .shortcut-icon {
+  transform: none;
+}
+
+.tile-badge {
+  position: absolute;
+  top: -6px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  animation: pop-in var(--dur-2) var(--ease-out) both;
+}
+
+.tile-badge.is-del {
+  left: -6px;
+  background: #ff453a;
+  color: #fff;
+  box-shadow: 0 3px 8px rgba(255, 69, 58, 0.45);
+}
+
+.tile-badge.is-edit {
+  right: -6px;
+  background: var(--panel-solid);
+  color: var(--text);
+  border: 1px solid var(--stroke);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+}
+
+.tile-badge:hover {
+  transform: scale(1.12);
+}
+
+.tile-badge:active {
+  transform: scale(0.9);
+}
+
+/* ==========================================================================
+   文件夹磁贴 + 合并预览
+   ========================================================================== */
+
+.shortcut-folder .folder-icon {
+  padding: 0;
+}
+
+.folder-minis {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 3px;
+  width: 100%;
+  height: 100%;
+  padding: 6px;
+  align-content: center;
+  justify-items: center;
+}
+
+.folder-mini {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--surface-active);
+  overflow: hidden;
+}
+
+.folder-mini-letter {
+  color: var(--text-2);
+  font-size: 9px;
+  font-weight: 600;
+  transition: opacity var(--dur-2) ease;
+}
+
+.folder-mini-favicon {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity var(--dur-2) ease;
+}
+
+.folder-mini.is-loaded .folder-mini-favicon {
+  opacity: 1;
+}
+
+.folder-mini.is-loaded .folder-mini-letter {
+  opacity: 0;
+}
+
+/* 拖到另一个图标中心：高亮 + 放大，提示「松手会合并成文件夹」 */
+.shortcut.is-merge .shortcut-icon {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  transform: scale(1.12);
+  box-shadow: 0 18px 34px rgba(0, 0, 0, 0.28);
+}
+
+.shortcut.is-merge::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ==========================================================================
+   文件夹内容弹窗
+   ========================================================================== */
+
+.folder-body {
+  padding-top: 6px;
+}
+
+/* 居中弹性布局：成员少时不留一排空格子，像 iOS 文件夹那样聚拢 */
+.folder-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 8px;
+  padding: 2px 0 6px;
+}
+
+.folder-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 84px;
+  padding: 12px 4px 10px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--dur-1) ease;
+}
+
+.folder-item:hover {
+  background: var(--surface-hover);
+}
+
+.folder-item-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1px solid var(--stroke);
+  border-radius: 14px;
+  background: var(--surface-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  transition: transform var(--dur-2) var(--ease-spring);
+}
+
+.folder-item:hover .folder-item-icon {
+  transform: translateY(-3px) scale(1.05);
+}
+
+.folder-item-icon .shortcut-letter {
+  font-size: 18px;
+}
+
+.folder-item-icon .shortcut-favicon {
+  width: 24px;
+  height: 24px;
+}
+
+.folder-item-icon.is-loaded .shortcut-favicon {
+  opacity: 1;
+}
+
+.folder-item-icon.is-loaded .shortcut-letter {
+  opacity: 0;
+}
+
+/* 移出文件夹：悬停成员才出现，避免误触 */
+.folder-pop {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid var(--stroke);
+  border-radius: 50%;
+  background: var(--panel-solid);
+  color: var(--text-2);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition:
+    opacity var(--dur-1) ease,
+    transform var(--dur-1) var(--ease-out),
+    color var(--dur-1) ease;
+}
+
+.folder-item:hover .folder-pop,
+.folder-pop:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.folder-pop:hover {
+  color: var(--danger);
+}
+
+.shortcuts-empty {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 20px 32px;
+  border: 1px dashed var(--stroke-strong);
+  border-radius: var(--radius-lg);
+  color: var(--text-3);
+  text-align: center;
+}
+
+.shortcuts-empty-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+.shortcuts-empty-text {
+  margin: 0;
+  font-size: 13px;
+}
+
+@media (hover: none) {
+  .shortcut-actions {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ==========================================================================
+   气泡菜单
+   ========================================================================== */
+
+.popover {
+  position: fixed;
+  top: 0;
+  left: -9999px;
+  z-index: 45;
+  min-width: 172px;
+  padding: 5px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  background: var(--panel-solid);
+  backdrop-filter: blur(30px) saturate(1.4);
+  box-shadow: var(--shadow-2);
+  animation: pop-in var(--dur-2) var(--ease-out) both;
+}
+
+.popover-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-1) ease,
+    color var(--dur-1) ease;
+}
+
+.popover-item:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.popover-item.is-danger {
+  color: var(--danger);
+}
+
+.popover-item.is-danger:hover {
+  background: rgba(255, 107, 107, 0.12);
+}
+
+/* 菜单顶部的目标名称：让人确认操作对象，长标题自动省略 */
+.popover-title {
+  max-width: 220px;
+  padding: 6px 10px 7px;
+  margin: 0 0 3px;
+  overflow: hidden;
+  border-bottom: 1px solid var(--stroke);
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ==========================================================================
+   面板：待办 / 便签（在弹窗内呈现）
+   ========================================================================== */
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.panel-todo {
+  gap: 10px;
+  padding: 4px 20px 16px;
+  /* 高度跟随内容：条目少时弹窗自然收缩，不留一大片空白 */
+  max-height: min(58vh, 470px);
+}
+
+.todo-form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 5px 4px 14px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  transition:
+    border-color var(--dur-2) ease,
+    box-shadow var(--dur-2) ease;
+}
+
+.todo-form:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.todo-input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  outline: none;
+}
+
+.todo-input::placeholder {
+  color: var(--text-3);
+}
+
+.todo-submit {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  transition:
+    transform var(--dur-1) var(--ease-out),
+    filter var(--dur-1) ease;
+}
+
+.todo-submit:hover {
+  filter: brightness(1.08);
+}
+
+.todo-submit:active {
+  transform: scale(0.92);
+}
+
+.todo-list {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 9px 8px;
+  border-radius: var(--radius-sm);
+  animation: rise-in var(--dur-2) var(--ease-out) both;
+  transition: background var(--dur-1) ease;
+}
+
+.todo-item:hover {
+  background: var(--surface);
+}
+
+.todo-check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  padding: 0;
+  border: 1.5px solid var(--text-3);
+  border-radius: 6px;
+  background: none;
+  color: transparent;
+  cursor: pointer;
+  transition:
+    background var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) ease,
+    color var(--dur-2) ease,
+    transform var(--dur-1) var(--ease-spring);
+}
+
+.todo-check:hover {
+  border-color: var(--accent);
+  transform: scale(1.08);
+}
+
+.todo-item.is-done .todo-check {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
+.todo-text {
+  flex: 1;
+  overflow-wrap: anywhere;
+  font-size: 13.5px;
+  line-height: 1.5;
+  cursor: pointer;
+  transition:
+    color var(--dur-2) ease,
+    opacity var(--dur-2) ease;
+}
+
+.todo-item.is-done .todo-text {
+  color: var(--text-3);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+}
+
+.todo-remove {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-3);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--dur-2) ease,
+    color var(--dur-1) ease;
+}
+
+.todo-item:hover .todo-remove,
+.todo-remove:focus-visible {
+  opacity: 1;
+}
+
+.todo-remove:hover {
+  color: var(--danger);
+}
+
+.todo-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid var(--stroke);
+}
+
+.todo-count {
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.todo-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  color: var(--text-3);
+  font-size: 13px;
+}
+
+.todo-empty p {
+  margin: 0;
+}
+
+/* ---------- 便签 ---------- */
+
+.panel-note {
+  gap: 8px;
+  padding: 4px 20px 18px;
+}
+
+.note-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 18px;
+  padding: 0 2px;
+}
+
+.note-status,
+.note-counter {
+  color: var(--text-3);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  transition: opacity var(--dur-2) ease;
+}
+
+.note-area {
+  width: 100%;
+  min-height: min(34vh, 260px);
+  padding: 14px 16px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.75;
+  outline: none;
+  resize: none;
+  transition:
+    border-color var(--dur-2) ease,
+    box-shadow var(--dur-2) ease;
+}
+
+.note-area:focus {
+  border-color: color-mix(in srgb, var(--accent) 50%, transparent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.note-area::placeholder {
+  color: var(--text-3);
+}
+
+/* ---------- 滚动条 ---------- */
+
+.todo-list::-webkit-scrollbar,
+.note-area::-webkit-scrollbar,
+.nav-scroll::-webkit-scrollbar,
+.drawer-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.todo-list::-webkit-scrollbar-thumb,
+.note-area::-webkit-scrollbar-thumb,
+.nav-scroll::-webkit-scrollbar-thumb,
+.drawer-body::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--stroke-strong);
+}
+
+.todo-list::-webkit-scrollbar-track,
+.note-area::-webkit-scrollbar-track,
+.nav-scroll::-webkit-scrollbar-track,
+.drawer-body::-webkit-scrollbar-track {
+  background: transparent;
+}

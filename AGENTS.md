@@ -9,7 +9,7 @@
 ## 0. 工作区事实
 
 - 仓库类型：pnpm workspace 单仓库，托管多个**互不相关**的 Chrome 扩展。
-- 当前状态：**暂无扩展**，仅有工作区基础设施与规范。不要假设任何扩展已存在。
+- 当前状态：已有 [`extensions/xtab`](./extensions/xtab)（新标签页，离线、零网络请求）。除它之外的扩展还不存在，不要假设。
 - 技术栈：Manifest V3 + TypeScript（strict）+ Vite + pnpm workspace + ESLint/Prettier + Vitest（+ Playwright 按需）。
 - Node.js：22.x LTS（最低 20.19.0）；pnpm ≥ 10（版本锁定在根 `packageManager` 字段）。
 - 根目录**不放任何扩展业务代码与业务依赖**。

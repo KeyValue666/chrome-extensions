@@ -1,0 +1,266 @@
+/* ==========================================================================
+   左侧 Dock
+   --------------------------------------------------------------------------
+   参考 macOS Dock 的三件事：
+   1) 图标随指针距离连续放大（JS 计算，lerp 追帧，不是一命中就跳变）
+   2) 名称只在悬停时以气泡出现，平时 Dock 只有图标
+   3) 选中态是一条短竖线 + 图标高亮，而不是整块背景
+   ========================================================================== */
+
+.dock {
+  position: fixed;
+  top: 50%;
+  left: 14px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 8px;
+  border: 1px solid var(--stroke);
+  border-radius: 26px;
+  background: var(--dock-bg);
+  backdrop-filter: blur(32px) saturate(1.8);
+  -webkit-backdrop-filter: blur(32px) saturate(1.8);
+  box-shadow:
+    0 22px 50px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  translate: 0 -50%;
+  transition:
+    transform 500ms var(--ease-spring),
+    opacity 260ms ease,
+    background-color 260ms ease,
+    box-shadow 260ms ease;
+  animation: dock-in 620ms var(--ease-spring) both;
+}
+
+.dock:hover {
+  background: var(--dock-bg-hover);
+  box-shadow:
+    0 26px 60px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
+
+/* 40px 图标 + 46px 行高：放大到 1.3 倍也不会互相压住 */
+.dock-item {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 46px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.dock-tile {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 13px;
+  background: var(--tile-bg, var(--surface-hover));
+  color: #fff;
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.18),
+    inset 0 1px 0 rgba(255, 255, 255, 0.16);
+  transform-origin: left center;
+  transition:
+    box-shadow 240ms ease,
+    filter 240ms ease;
+  will-change: transform;
+}
+
+.dock-tile svg {
+  display: block;
+}
+
+/* 全部 / 未分组 / 新建：中性半透明，不与彩色分组抢注意力 */
+.dock-item.is-plain .dock-tile {
+  background: var(--surface-hover);
+  color: var(--text-2);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.dock-item.is-plain.is-active .dock-tile {
+  background: var(--accent);
+  color: #fff;
+  box-shadow:
+    0 6px 18px color-mix(in srgb, var(--accent) 42%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.24);
+}
+
+.dock-item.is-active .dock-tile {
+  filter: brightness(1.05);
+  box-shadow:
+    0 6px 18px rgba(0, 0, 0, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+/* 选中指示：Dock 左缘的一条短竖线 */
+.dock-item.is-active::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: -1px;
+  width: 3px;
+  height: 16px;
+  border-radius: 3px;
+  background: var(--accent);
+  translate: 0 -50%;
+  animation: bar-in 220ms var(--ease-spring) both;
+}
+
+/* 悬停气泡：名称 + 数量，只在需要时出现 */
+.dock-tip {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 14px);
+  z-index: 2;
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--stroke);
+  border-radius: 9px;
+  background: var(--panel-solid);
+  box-shadow: var(--shadow-1);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  translate: -6px -50%;
+  transition:
+    opacity 140ms ease,
+    translate 240ms var(--ease-out);
+}
+
+.dock-item:hover .dock-tip,
+.dock-item:focus-visible .dock-tip {
+  opacity: 1;
+  translate: 0 -50%;
+}
+
+/* 右键菜单展开时收起气泡，两层文字叠在一起很脏 */
+.dock.is-menu-open .dock-tip {
+  opacity: 0;
+}
+
+.dock-tip-name {
+  font-weight: 550;
+}
+
+.dock-tip-meta {
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.dock-sep {
+  width: 20px;
+  height: 1px;
+  margin: 3px 0;
+  border-radius: 1px;
+  background: var(--stroke-strong);
+}
+
+/* 自动隐藏：平时缩到屏幕外，贴边才滑出 */
+.dock-sensor {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 29;
+  width: 16px;
+  pointer-events: none;
+}
+
+body.is-dock-autohide .dock-sensor {
+  pointer-events: auto;
+}
+
+body.is-dock-autohide .dock:not(.is-peek) {
+  transform: translateX(calc(-100% - 26px));
+  opacity: 0;
+}
+
+body.is-dock-autohide .dock.is-peek {
+  transform: none;
+  opacity: 1;
+}
+
+@keyframes dock-in {
+  from {
+    scale: 0.9;
+  }
+  to {
+    scale: 1;
+  }
+}
+
+/* 触屏没有 hover：关闭放大与气泡位移，避免点完留下残留态 */
+@media (hover: none) {
+  .dock-tile {
+    transform: none !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .dock {
+    top: auto;
+    bottom: 14px;
+    left: 50%;
+    flex-direction: row;
+    gap: 4px;
+    max-width: calc(100vw - 20px);
+    padding: 8px 9px;
+    overflow-x: auto;
+    translate: -50% 0;
+    scrollbar-width: none;
+  }
+
+  .dock::-webkit-scrollbar {
+    display: none;
+  }
+
+  .dock-item {
+    width: 44px;
+    height: 44px;
+  }
+
+  .dock-item.is-active::before {
+    top: auto;
+    bottom: -1px;
+    left: 50%;
+    width: 14px;
+    height: 3px;
+    translate: -50% 0;
+  }
+
+  .dock-tip {
+    top: auto;
+    bottom: calc(100% + 12px);
+    left: 50%;
+    translate: -50% 6px;
+  }
+
+  .dock-item:hover .dock-tip,
+  .dock-item:focus-visible .dock-tip {
+    translate: -50% 0;
+  }
+
+  .dock-sep {
+    width: 1px;
+    height: 20px;
+    margin: 0 3px;
+  }
+
+  body.is-dock-autohide .dock:not(.is-peek) {
+    transform: translateY(calc(100% + 24px));
+  }
+}

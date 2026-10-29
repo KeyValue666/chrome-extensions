@@ -1,0 +1,182 @@
+# XTab
+
+离线优先的 Chrome 新标签页：时钟、聚合搜索、快捷方式分组、壁纸、待办与便签。
+
+参考 [iTab](https://itab.link/) 的产品形态，但刻意砍掉了所有需要联网与账号的东西——**没有服务器、没有账号、没有网络请求**，所有数据只存在你本机。
+
+## 功能
+
+| 模块 | 能力 |
+| --- | --- |
+| 时钟 | 大字号细体时间 + 问候语 + 中文日期；可切 24/12 小时制、可显示秒；点击时钟进入极简模式 |
+| 搜索 | 8 个搜索引擎一键切换（Google / Bing / 百度 / 知乎 / B 站 / GitHub / 搜狗 / DuckDuckGo）；输入网址直接跳转，普通文本交给搜索引擎 |
+| 左侧 Dock | 全部 / 未分组 / 自定义分组的纯图标导航；指针靠近时图标连续放大（跟随距离，不是整块跳变），悬停出名称气泡；选中项有短竖线指示；可设「自动隐藏」，贴左边缘滑出 |
+| 分组管理 | 新建、重命名、换图标、隐藏、删除；**右键（触屏长按）才出菜单**，平时 Dock 与图标上不挂任何小按钮 |
+| 快捷方式 | 增删改、按分组筛选、拖拽排序、favicon 自动获取；右键菜单含打开 / 编辑 / 复制链接 / 删除；每次操作即时保存 |
+| 壁纸 | 12 套多层径向渐变（不是单条线性渐变）+ 本地上传图片；可开毛玻璃、可调暗度；浅色主题把壁纸提亮成柔和彩色而不是压灰 |
+| 待办 | 作为图标排在快捷方式网格最前，点击弹出面板：添加、勾选、删除、清除已完成；未完成数量显示在图标右上角角标 |
+| 便签 | 同样是网格里的图标，弹窗内输入即存（500ms 防抖 + 失焦落盘），显示字数，上限 20000 字 |
+| 视觉 | 优先使用苹果系统字体（SF Pro / PingFang SC），统一的圆角、毛玻璃与缓动曲线，支持 `prefers-reduced-motion` |
+| 主题 | 跟随系统 / 浅色 / 深色 |
+| 数据 | 一键导出/导入 JSON 备份，一键恢复默认 |
+| 快捷键 | `/` 或 `Ctrl/⌘ + K` 聚焦搜索，`Esc` 退出极简模式或关闭弹窗 |
+
+## 权限说明
+
+| 权限 | 用途 | 为什么不需要更多 |
+| --- | --- | --- |
+| `storage` | 保存设置、快捷方式、待办、便签 | 不用 `storage.sync`（壁纸与长便签会撞 100KB 配额），也不申请 `unlimitedStorage` |
+| `favicon` | 通过 `chrome-extension://<id>/_favicon/` 读取本地图标缓存 | 不走第三方 favicon 服务，避免任何网络请求与隐私泄露 |
+
+- `host_permissions`：**无**。
+- `content_scripts` / `background` / `web_accessible_resources`：**无**——新标签页是纯扩展页面，不需要注入任何网站。
+- 不读取当前标签页、不读 Cookie、不读浏览历史。
+
+## 目录结构
+
+```
+extensions/xtab/
+├─ manifest.json        # MV3 声明：newtab 覆盖 + storage/favicon
+├─ index.html           # 新标签页骨架
+├─ vite.config.ts       # 构建 + 把 manifest.json 复制进 dist
+├─ public/icons/        # 16/32/48/128 图标（由 tools/make-icons.mjs 生成）
+├─ tools/
+│  ├─ make-icons.mjs    # 零依赖 PNG 生成器（图标改版时手动跑）
+│  ├─ ui-check.mjs      # 用本机 Chrome 跑一遍主要交互并截图
+│  └─ dev-hub.ts        # 开发期热重载中枢（本机回环端口上的版本号服务）
+├─ src/
+│  ├─ main.ts           # 启动、上下文组装、全局快捷键
+│  ├─ dev/              # 仅开发构建引用的自动刷新客户端（生产包内不存在）
+│  ├─ shared/           # 类型、常量、状态规范化、chrome.storage 封装、壁纸 IndexedDB
+│  ├─ lib/              # 纯函数：URL、时间、数组、DOM、图标
+│  ├─ ui/               # Dock、右键菜单、设置抽屉、弹窗、待办/便签面板、工具条、外观应用
+│  ├─ widgets/          # 时钟、搜索、快捷方式、待办、便签
+│  └─ styles/           # base / dock / widgets / settings
+└─ tests/               # Vitest：URL、时间、列表、状态迁移
+```
+
+## 开发与调试
+
+| 命令 | 作用 |
+| --- | --- |
+| `pnpm --filter xtab dev` | watch 构建 + 自动刷新（日常开发用这个） |
+| `pnpm --filter xtab dev:ui` | vite dev server，HMR 调样式 |
+| `pnpm --filter xtab build` | 生产构建，产物在 `extensions/xtab/dist` |
+| `pnpm --filter xtab typecheck` | `tsc --noEmit` |
+| `pnpm --filter xtab test` | `vitest run` |
+| `pnpm run check`（仓库根） | lint → format → typecheck → test → build 全量检查 |
+
+### 第一次：把扩展加载进 Chrome（只做一次）
+
+```bash
+pnpm install
+pnpm --filter xtab build        # 产物 → extensions/xtab/dist
+```
+
+1. Chrome 地址栏打开 `chrome://extensions/`
+2. 右上角开启「**开发者模式**」
+3. 点「**加载已解压的扩展程序**」，选中 `extensions/xtab/dist` 目录
+4. 按 `Ctrl+T` 开新标签页，看到 XTab 即成功
+
+之后这个扩展会一直留在这个 Chrome 配置里，重启浏览器也不用再加载。
+
+> 如果新标签页还是原来的样子，检查两件事：① 是否同时装了别的新标签页扩展（iTab、Infinity 等），一个浏览器只允许一个扩展接管新标签页，先把它们停用；② 已打开的标签页不会自动变，必须新开一个。
+
+### 日常开发：保存即刷新
+
+```bash
+pnpm --filter xtab dev          # watch 构建 + 热重载通道
+```
+
+改完代码存盘 → 约 1 秒内扩展里的新标签页自动整页刷新，不用再点「重新加载」，也不用手动 `F5`。
+
+实现方式：watch 构建时会在 `127.0.0.1:3579` 起一个只返回版本号的本地服务，每次构建完成版本号 +1；页面（仅开发构建、且只在扩展环境里）每 600ms 取一次版本号，发现变化就 `location.reload()`。它不写入任何数据、不需要主机权限、生产构建里完全不存在（`pnpm --filter xtab build` 后搜不到 `3579`）。
+
+两种情况仍需在 `chrome://extensions/` 点一次「重新加载」：
+
+- 改了 `manifest.json`（权限、图标路径、入口页）
+- 往里加了新的 `public/` 静态资源目录结构
+
+### 只想调样式 / 布局：真正的 HMR
+
+```bash
+pnpm --filter xtab dev:ui       # http://localhost:5174
+```
+
+这是普通 vite dev server，改 CSS/TS 会热更新而不刷新页面，适合反复微调间距和配色。差异只有一处：**没有 `chrome.*` API**——数据落 `localStorage`、快捷方式图标显示首字母而不是网站 favicon，其余交互一致。
+
+### 在 DevTools 里看数据和状态
+
+- 在新标签页按 `F12`（或 `Ctrl+Shift+I`）
+- 看存储：Console 里执行 `await chrome.storage.local.get(console.log)`
+- 看壁纸：`Application → IndexedDB → xtab-assets`
+- 想回到初始状态：`await chrome.storage.local.clear()` 后刷新（壁纸需在设置里单独删）
+- 扩展自身的报错：`chrome://extensions/` 上 XTab 卡片里的「**错误**」按钮；本扩展没有 service worker，所以看不到「检查视图」入口是正常的
+
+### 出包前
+
+```bash
+pnpm --filter xtab build        # 生产构建，会清空 dist 并去掉全部开发代码
+```
+
+`dev` 和 `build` 写的是同一个 `dist`，别同时跑；`dev` 为了不让 Chrome 因 manifest 短暂消失而卸载扩展，**不会清空** `dist`（历史 hash 文件会留着），`build` 才会清干净。
+
+## 在 Chrome 中加载（生产构建）
+
+1. `pnpm --filter xtab build`
+2. 打开 `chrome://extensions/`，右上角开启「开发者模式」
+3. 点击「加载已解压的扩展程序」，选择 `extensions/xtab/dist`
+4. 新建标签页即可看到 XTab；改代码后重新构建，再点扩展卡片上的「重新加载」
+
+## 本地预览（不装扩展）
+
+`dist/` 是纯静态站点，可以起个静态服务器直接看效果：
+
+```bash
+cd extensions/xtab/dist && python -m http.server 8123
+# 浏览器打开 http://127.0.0.1:8123/index.html
+```
+
+这种模式下没有 `chrome.*` API：数据回退到 `localStorage`，图标显示首字母而不是网站 favicon，其他功能与扩展内一致。
+
+## 数据存储位置
+
+| 内容 | 位置 | 说明 |
+| --- | --- | --- |
+| 设置、快捷方式、待办、便签 | `chrome.storage.local`（单 key `xtab:state:v1`） | 每次改动 300ms 防抖落盘，关页面前补写一次 |
+| 自定义壁纸 | IndexedDB `xtab-assets` | 上传时压缩到最长边 2560px、JPEG 0.86，通常 < 1MB |
+
+写入前都会经过 `normalizeState()` 做字段校验：被手改坏的配置、旧版本数据、非法导入文件都只会丢弃异常项，不会让页面白屏。
+
+## 已验证 / 未验证
+
+已验证（自动化）：
+
+- `pnpm --filter xtab typecheck` / `test`（49 个单测）/ `build` 全部通过。
+- `node tools/ui-check.mjs` 用本机 Chrome 跑通 37 项交互：Dock 筛选与计数、图标跟随放大、悬停不出现操作按钮且无整块底纹、右键菜单（快捷方式与分组，且不压住 Dock）、新增/删除快捷方式、新建分组（含图标选择）、隐藏与恢复、删除分组、待办图标与角标、便签持久化、刷新后状态保留、Dock 自动隐藏与贴边唤出、主题切换，且无 console 报错。
+- `chrome --pack-extension` 打包成功，即 Manifest 结构合法、图标等引用资源齐全。
+- 开发期自动刷新端到端验证：改 `base.css` → watch 重建 → 页面自行 reload 且新样式生效，全程无 console 报错。
+- 生产构建产物内不含热重载代码（搜不到 `3579` / `reload-client`），`dist/assets` 只有 1 个 JS + 1 个 CSS。
+
+未验证（需要人工在真实扩展环境确认）：
+
+- `chrome.storage.local` 读写与 `chrome.favicon` 图标显示——无头 Chrome 不加载扩展，无法自动覆盖。
+- 新标签页覆盖在真实新建标签时的表现。
+
+人工验证步骤：加载 `dist` 后新建标签页 → 时钟正常走动 → 添加一个快捷方式并刷新页面确认仍在 → 检查该快捷方式显示网站图标 → 上传一张壁纸后重启浏览器确认保留。
+
+## 已知限制
+
+- 自定义壁纸不在 JSON 备份内（备份只含配置与文本数据），换设备需要重新上传。
+- 极简模式会被记住：在极简模式下关闭标签页，下次新标签页仍是极简。
+- 未接入天气、日历、热搜、汇率：这些都需要第三方 API 与网络权限，与「零联网」的设计冲突，如需接入应先评估权限与隐私成本。
+- 分组图标是自绘的线性 SVG（20 个）。iconfont 的图标需要登录下载，且免费授权默认只覆盖个人使用场景，所以没有引入字体文件——省体积、可离线、风格统一，需要新图标时在 `src/lib/icons.ts` 里加一条路径即可。
+- favicon 依赖 Chrome 本地图标缓存，从未访问过的站点会显示首字母。
+
+## 图标
+
+图标是脚本生成的（圆角渐变方块 + 白色 X），没有引入任何图像库：
+
+```bash
+node tools/make-icons.mjs   # 重新生成 public/icons/*.png
+```

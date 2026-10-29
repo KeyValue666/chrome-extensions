@@ -1,0 +1,709 @@
+/* ==========================================================================
+   XTab 设计令牌
+   字体优先走苹果系统字体（macOS 上是 SF Pro / PingFang SC），
+   其他平台按 system-ui -> Segoe UI / 微软雅黑 依次回退，不加载任何网络字体。
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue',
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei UI', 'Microsoft YaHei', system-ui,
+    sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --text: rgba(255, 255, 255, 0.95);
+  --text-2: rgba(255, 255, 255, 0.66);
+  --text-3: rgba(255, 255, 255, 0.38);
+
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.1);
+  --surface-active: rgba(255, 255, 255, 0.14);
+  --stroke: rgba(255, 255, 255, 0.09);
+  --stroke-strong: rgba(255, 255, 255, 0.16);
+  --panel: rgba(20, 22, 30, 0.58);
+  --panel-solid: rgba(22, 24, 32, 0.94);
+
+  --accent: #6ea8ff;
+  --accent-soft: rgba(110, 168, 255, 0.16);
+  --danger: #ff6b6b;
+
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.18), 0 10px 30px rgba(0, 0, 0, 0.22);
+  --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.24), 0 24px 60px rgba(0, 0, 0, 0.36);
+
+  --radius-xl: 24px;
+  --radius-lg: 18px;
+  --radius-md: 13px;
+  --radius-sm: 9px;
+
+  /* 动效：统一用同一条缓动曲线，快慢只改 duration */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+  --dur-3: 320ms;
+
+  --dim-alpha: 0.1;
+
+  /* Dock 占据的横向空间：14px 外边距 + 64px 宽度 + 24px 呼吸 */
+  --dock-space: 104px;
+  --dock-bg: rgba(18, 20, 28, 0.42);
+  --dock-bg-hover: rgba(18, 20, 28, 0.54);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --text: rgba(16, 18, 24, 0.95);
+  --text-2: rgba(16, 18, 24, 0.78);
+  --text-3: rgba(16, 18, 24, 0.46);
+
+  --surface: rgba(255, 255, 255, 0.6);
+  --surface-hover: rgba(255, 255, 255, 0.78);
+  --surface-active: rgba(255, 255, 255, 0.92);
+  --stroke: rgba(16, 18, 24, 0.1);
+  --stroke-strong: rgba(16, 18, 24, 0.16);
+  --panel: rgba(252, 252, 254, 0.7);
+  --panel-solid: rgba(252, 252, 254, 0.97);
+
+  --accent: #2f6fed;
+  --accent-soft: rgba(47, 111, 237, 0.12);
+  --shadow-1: 0 1px 2px rgba(16, 18, 24, 0.06), 0 10px 30px rgba(16, 18, 24, 0.1);
+  --shadow-2: 0 2px 8px rgba(16, 18, 24, 0.1), 0 24px 60px rgba(16, 18, 24, 0.16);
+
+  --dock-bg: rgba(255, 255, 255, 0.56);
+  --dock-bg-hover: rgba(255, 255, 255, 0.72);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  color: var(--text);
+  background: #06070b;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- 背景三层 ---------- */
+
+.bg {
+  position: fixed;
+  inset: 0;
+  z-index: -3;
+  background-position: center;
+  background-size: cover;
+  transform: scale(1.02);
+  transition:
+    filter var(--dur-3) var(--ease-out),
+    opacity var(--dur-3) var(--ease-out);
+}
+
+body.is-blurred .bg {
+  filter: blur(28px) saturate(1.1);
+  transform: scale(1.1);
+}
+
+/* 浅色主题不压白纱（会发灰），而是把壁纸整体提亮成柔和的彩色 */
+[data-theme='light'] .bg {
+  filter: brightness(1.46) saturate(1.04);
+}
+
+[data-theme='light'] body.is-blurred .bg {
+  filter: brightness(1.46) saturate(1.04) blur(28px);
+}
+
+.bg-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, 0.34) 100%),
+    rgba(4, 6, 10, var(--dim-alpha));
+}
+
+[data-theme='light'] .bg-overlay {
+  /* 壁纸已经提亮过，这里只补一层很薄的白纱保证文字对比度 */
+  background:
+    radial-gradient(120% 90% at 50% -10%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0) 60%),
+    rgba(255, 255, 255, calc(0.2 + var(--dim-alpha) * 0.4));
+}
+
+/* 极细噪点：让纯 CSS 渐变不像塑料，成本只有一个 data URI */
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0.038;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  mix-blend-mode: overlay;
+}
+
+[data-theme='light'] .grain {
+  opacity: 0.026;
+}
+
+/* ---------- 总体布局 ---------- */
+
+.app {
+  min-height: 100vh;
+  padding-left: var(--dock-space);
+  transition: padding-left var(--dur-3) var(--ease-out);
+}
+
+.stage {
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 0 clamp(20px, 4vw, 56px) 64px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(28px, 4vh, 44px);
+  width: min(940px, 100%);
+  padding-top: clamp(56px, 15vh, 168px);
+}
+
+/* ---------- 时钟 ---------- */
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(20px, 3vh, 30px);
+  animation: rise-in var(--dur-3) var(--ease-out) both;
+}
+
+.clock-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 2px 14px 8px;
+  border: 0;
+  border-radius: var(--radius-lg);
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  transition: transform var(--dur-2) var(--ease-out);
+}
+
+.clock-button:hover {
+  transform: translateY(-2px);
+}
+
+.clock-button:active {
+  transform: translateY(0) scale(0.995);
+}
+
+.clock {
+  color: var(--text);
+  font-size: clamp(66px, 10.5vw, 146px);
+  font-weight: 260;
+  font-variant-numeric: tabular-nums;
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+  text-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+  transition:
+    font-size var(--dur-2) var(--ease-out),
+    opacity var(--dur-2) ease;
+}
+
+.clock.clock-long {
+  font-size: clamp(44px, 7vw, 94px);
+  letter-spacing: -0.035em;
+}
+
+.date {
+  color: var(--text-2);
+  font-size: clamp(12.5px, 1.1vw, 14px);
+  font-weight: 450;
+  letter-spacing: 0.06em;
+}
+
+/* ---------- 搜索 ---------- */
+
+.search {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.search-form {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(640px, 100%);
+  padding: 5px 6px 5px 18px;
+  border: 1px solid var(--stroke-strong);
+  border-radius: 999px;
+  background: var(--surface);
+  backdrop-filter: blur(26px) saturate(1.4);
+  -webkit-backdrop-filter: blur(26px) saturate(1.4);
+  box-shadow: var(--shadow-1);
+  transition:
+    transform var(--dur-2) var(--ease-out),
+    border-color var(--dur-2) ease,
+    box-shadow var(--dur-2) ease,
+    background var(--dur-2) ease;
+}
+
+.search-form:hover {
+  background: var(--surface-hover);
+}
+
+.search-form:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  background: var(--surface-hover);
+  box-shadow:
+    var(--shadow-1),
+    0 0 0 4px var(--accent-soft);
+  transform: translateY(-1px);
+}
+
+.search-icon {
+  display: flex;
+  flex: none;
+  color: var(--text-3);
+  transition: color var(--dur-2) ease;
+}
+
+.search-form:focus-within .search-icon {
+  color: var(--accent);
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 2px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  letter-spacing: 0.005em;
+  outline: none;
+}
+
+.search-input::placeholder {
+  color: var(--text-3);
+}
+
+.search-engine {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 11px 6px 7px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--surface-hover);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition:
+    color var(--dur-1) ease,
+    background var(--dur-1) ease,
+    transform var(--dur-1) var(--ease-out);
+}
+
+.search-engine:hover {
+  background: var(--surface-active);
+  color: var(--text);
+}
+
+.search-engine:active {
+  transform: scale(0.96);
+}
+
+.search-engine-art {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+}
+
+.engine-art {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.18));
+}
+
+.caret {
+  width: 0;
+  height: 0;
+  border-top: 4.5px solid currentColor;
+  border-right: 4px solid transparent;
+  border-left: 4px solid transparent;
+  opacity: 0.6;
+  transition: transform var(--dur-2) var(--ease-out);
+}
+
+.search-engine[aria-expanded='true'] .caret {
+  transform: rotate(180deg);
+}
+
+/* 引擎菜单：图标 + 名称的网格（参考 iTab），不再是纯文字列表 */
+.engine-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 25;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 2px;
+  width: 264px;
+  padding: 8px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  background: var(--panel-solid);
+  backdrop-filter: blur(30px) saturate(1.4);
+  box-shadow: var(--shadow-2);
+  transform-origin: top right;
+  animation: pop-in var(--dur-2) var(--ease-out) both;
+}
+
+.engine-menu[hidden] {
+  display: none;
+}
+
+.engine-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 4px 8px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    background var(--dur-1) ease,
+    color var(--dur-1) ease,
+    transform var(--dur-1) var(--ease-out);
+}
+
+.engine-option:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.engine-option:active {
+  transform: scale(0.94);
+}
+
+.engine-option-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  transition: transform var(--dur-2) var(--ease-spring);
+}
+
+.engine-option:hover .engine-option-icon {
+  transform: translateY(-1px) scale(1.08);
+}
+
+.engine-option-name {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 11px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.engine-option.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.engine-option.is-active .engine-option-name {
+  font-weight: 600;
+}
+
+/* ---------- 工具条 ---------- */
+
+.toolbar {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  z-index: 22;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: var(--panel);
+  backdrop-filter: blur(28px) saturate(1.5);
+  -webkit-backdrop-filter: blur(28px) saturate(1.5);
+  box-shadow: var(--shadow-1);
+  animation: fade-down var(--dur-3) var(--ease-out) both;
+}
+
+.toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.tool-button {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    background var(--dur-1) ease,
+    color var(--dur-1) ease,
+    transform var(--dur-1) var(--ease-out);
+}
+
+.tool-button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.tool-button:active {
+  transform: scale(0.94);
+}
+
+.tool-button[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* ---------- 通用小按钮 ---------- */
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-2);
+  cursor: pointer;
+  transition:
+    background var(--dur-1) ease,
+    color var(--dur-1) ease;
+}
+
+.icon-button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* ---------- 极简模式 ---------- */
+
+body.is-minimal .dock,
+body.is-minimal .toolbar,
+body.is-minimal .shortcuts-area {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+}
+
+.shortcuts-area {
+  transition:
+    opacity var(--dur-2) ease,
+    transform var(--dur-2) var(--ease-out);
+}
+
+body.is-minimal .app {
+  padding-left: 0;
+}
+
+body.is-minimal .content {
+  gap: 32px;
+  padding-top: clamp(96px, 32vh, 300px);
+}
+
+.minimal-hint {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  z-index: 12;
+  padding: 8px 16px;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: var(--panel);
+  backdrop-filter: blur(20px);
+  color: var(--text-3);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px);
+  transition:
+    opacity var(--dur-2) ease,
+    transform var(--dur-2) var(--ease-out);
+}
+
+body.is-minimal .minimal-hint {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+/* ---------- 动画 ---------- */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes fade-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes bar-in {
+  from {
+    opacity: 0;
+    transform: scaleY(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ---------- 可访问性 ---------- */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- 响应式 ---------- */
+
+@media (max-width: 980px) {
+  :root {
+    --dock-space: 94px;
+  }
+}
+
+@media (max-width: 640px) {
+  :root {
+    --dock-space: 0px;
+  }
+
+  .app {
+    padding-left: 0;
+    padding-bottom: 84px;
+  }
+
+  .content {
+    padding-top: clamp(32px, 10vh, 72px);
+    padding-bottom: 96px;
+  }
+
+  .clock {
+    font-size: clamp(56px, 17vw, 84px);
+  }
+}

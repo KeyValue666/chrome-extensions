@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "XTab",
+  "version": "0.1.0",
+  "description": "离线可用的新标签页：时钟、聚合搜索、快捷方式、壁纸、待办与便签。",
+  "minimum_chrome_version": "110",
+  "offline_enabled": true,
+  "chrome_url_overrides": {
+    "newtab": "index.html"
+  },
+  "permissions": ["storage", "favicon"],
+  "icons": {
+    "16": "icons/icon-16.png",
+    "32": "icons/icon-32.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  }
+}

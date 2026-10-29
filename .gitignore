@@ -50,6 +50,9 @@ temp/
 *.swp
 *~
 
+# ---------- 本地预览与截图（tools/ui-check.mjs 输出） ----------
+.preview/
+
 # ---------- 本地测试数据与浏览器调试产物 ----------
 .local-data/
 .fixtures-local/
@@ -76,3 +79,4 @@ $RECYCLE.BIN/
 *.jks
 secrets/
 .workbuddy/
+**/tests/**

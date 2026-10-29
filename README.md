@@ -5,7 +5,7 @@
 ## 1. 项目简介
 
 - 仓库用途：以 AI 编码工具（Codex / Claude Code / Cursor 等）为主要开发者，持续新增与维护多个彼此独立的 Chrome 扩展。
-- 当前状态：**暂无扩展**，仅完成工作区基础设施与开发规范初始化。
+- 当前状态：1 个扩展 —— [`xtab`](./extensions/xtab)（新标签页，离线、零网络权限）。
 - 核心规范：[`AGENTS.md`](./AGENTS.md)（AI 与人共同遵守）、[`docs/architecture.md`](./docs/architecture.md)（架构与技术决策）。
 
 ## 2. 项目定位与设计原则
@@ -152,13 +152,11 @@ pnpm --filter <name> add -D <pkg>   # 只给该扩展加依赖
 
 ## 10. 当前扩展清单
 
-**暂无扩展。**
-
-新增扩展后在此维护：
-
 | 扩展 | 目录 | 说明 | 主要权限 |
 | --- | --- | --- | --- |
-| 暂无 | - | - | - |
+| XTab | `extensions/xtab` | 离线可用的新标签页：时钟、聚合搜索、快捷方式分组、壁纸、待办、便签 | `storage`、`favicon` |
+
+新增扩展后在此追加行，并用 `pnpm run list:ext` 校对。
 
 可用 `pnpm run list:ext` 获取最新清单。
 
