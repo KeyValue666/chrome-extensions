@@ -4,8 +4,10 @@
 
 .shortcuts-area {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
 }
 
 /* 网格上方不再放「全部 / 新增」标题行，筛选交给左侧 Dock，
@@ -41,11 +43,67 @@
   transform: scale(0.97);
 }
 
+/* 列优先网格：行数按可视高度自动填充，放不下就横向滚动，
+   滚轮在网格上左右翻页（滚到头再切分类，逻辑在 sidebar.ts） */
 .shortcut-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
-  gap: 2px;
+  flex: 1;
+  grid-auto-columns: minmax(86px, 1fr);
+  grid-auto-flow: column;
+  grid-template-rows: repeat(auto-fill, 106px);
+  align-content: start;
   align-items: start;
+  gap: 2px;
+  justify-content: start;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 6px 2px 12px;
+  scrollbar-width: none;
+}
+
+.shortcut-grid::-webkit-scrollbar {
+  display: none;
+}
+
+/* 还有更多内容时两侧渐隐提示；起始端没有遮罩（is-at-start 由 JS 维护） */
+.shortcut-grid.has-overflow {
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%);
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 22px), transparent 100%);
+}
+
+.shortcut-grid.has-overflow:not(.is-at-start) {
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 22px,
+    #000 calc(100% - 22px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 22px,
+    #000 calc(100% - 22px),
+    transparent 100%
+  );
+}
+
+/* 空视图：不用横向网格，居中展示引导 */
+.shortcut-grid.is-empty {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+  overflow: visible;
+}
+
+/* 一屏放得下：行优先常规网格，从左往右排；
+   app 少的分组不再被列优先布局拉成一条居中的竖列 */
+.shortcut-grid.is-row-major {
+  grid-auto-flow: row;
+  grid-template-rows: none;
+  grid-auto-rows: 106px;
+  grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
 }
 
 .shortcut {
@@ -158,6 +216,20 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 
+.shortcut-app-pomodoro .app-icon {
+  background: linear-gradient(150deg, #ff9a76, #f4573f 58%, #d63c74);
+  box-shadow:
+    0 8px 22px rgba(244, 87, 63, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
+.shortcut-app-countdown .app-icon {
+  background: linear-gradient(150deg, #63d9c3, #2fa89e 58%, #3a7fd6);
+  box-shadow:
+    0 8px 22px rgba(47, 168, 158, 0.34),
+    inset 0 1px 0 rgba(255, 255, 255, 0.28);
+}
+
 .shortcut-app:hover .app-icon {
   box-shadow:
     0 16px 32px rgba(106, 91, 255, 0.42),
@@ -223,10 +295,43 @@
   animation-delay: 0ms;
 }
 
+/* 滚轮/顺序切换分类时按方向滑入：下一个从右来，上一个从左来 */
+.is-entering.is-from-right .shortcut,
+.is-entering.is-from-right .shortcut-add {
+  animation-name: tile-in-right;
+}
+
+.is-entering.is-from-left .shortcut,
+.is-entering.is-from-left .shortcut-add {
+  animation-name: tile-in-left;
+}
+
 @keyframes tile-in {
   from {
     opacity: 0;
     transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tile-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(30px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes tile-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-30px) scale(0.97);
   }
   to {
     opacity: 1;
@@ -260,14 +365,69 @@
   transform: none;
 }
 
+/* 选中：暂停抖动并套强调色描边，一眼看出会删掉哪些 */
+.shortcut-grid.is-editing .shortcut.is-selected .shortcut-icon {
+  animation: none;
+  transform: none;
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.shortcut-grid.is-editing .shortcut.is-selected .shortcut-title {
+  color: var(--text);
+}
+
+.shortcut.is-selected {
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent-strong);
+}
+
+/* 编辑模式操作条：选中计数 + 全选 / 删除 / 完成 */
+.edit-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 2px;
+  animation: edit-bar-in var(--dur-2) var(--ease-out) both;
+}
+
+@keyframes edit-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.edit-bar-count {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.edit-bar-count.is-empty {
+  color: var(--text-3);
+  font-weight: 400;
+}
+
+.edit-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .tile-badge {
   position: absolute;
-  top: -6px;
-  z-index: 4;
+  top: -8px;
+  z-index: 5;
   display: grid;
   place-items: center;
-  width: 20px;
-  height: 20px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   border: 0;
   border-radius: 50%;
@@ -275,23 +435,40 @@
   animation: pop-in var(--dur-2) var(--ease-out) both;
 }
 
+/* 角标视觉 26px，热区再外扩 8px：手指/鼠标不用瞄得很准 */
+.tile-badge::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+}
+
+.tile-badge svg {
+  width: 14px;
+  height: 14px;
+}
+
 .tile-badge.is-del {
-  left: -6px;
+  left: -10px;
   background: #ff453a;
   color: #fff;
-  box-shadow: 0 3px 8px rgba(255, 69, 58, 0.45);
+  box-shadow: 0 4px 10px rgba(255, 69, 58, 0.45);
 }
 
 .tile-badge.is-edit {
-  right: -6px;
+  right: -10px;
   background: var(--panel-solid);
   color: var(--text);
   border: 1px solid var(--stroke);
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18);
 }
 
 .tile-badge:hover {
-  transform: scale(1.12);
+  transform: scale(1.1);
+}
+
+.tile-badge:active {
+  transform: scale(0.96);
 }
 
 .tile-badge:active {
@@ -832,6 +1009,7 @@
 
 .todo-list::-webkit-scrollbar,
 .note-area::-webkit-scrollbar,
+.countdown-list::-webkit-scrollbar,
 .nav-scroll::-webkit-scrollbar,
 .drawer-body::-webkit-scrollbar {
   width: 6px;
@@ -839,6 +1017,7 @@
 
 .todo-list::-webkit-scrollbar-thumb,
 .note-area::-webkit-scrollbar-thumb,
+.countdown-list::-webkit-scrollbar-thumb,
 .nav-scroll::-webkit-scrollbar-thumb,
 .drawer-body::-webkit-scrollbar-thumb {
   border-radius: 3px;
@@ -847,7 +1026,248 @@
 
 .todo-list::-webkit-scrollbar-track,
 .note-area::-webkit-scrollbar-track,
+.countdown-list::-webkit-scrollbar-track,
 .nav-scroll::-webkit-scrollbar-track,
 .drawer-body::-webkit-scrollbar-track {
   background: transparent;
+}
+
+/* ==========================================================================
+   番茄钟面板
+   ========================================================================== */
+
+.panel-pomodoro {
+  gap: 14px;
+  padding: 4px 20px 18px;
+}
+
+.pomodoro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.pomodoro-dial {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 200px;
+  height: 200px;
+}
+
+.pomodoro-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.pomodoro-ring-track {
+  fill: none;
+  stroke: var(--surface-active);
+  stroke-width: 6;
+}
+
+.pomodoro-ring-bar {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 250ms linear;
+}
+
+body.is-pomodoro-break .pomodoro-ring-bar {
+  stroke: #4fd1a5;
+}
+
+.pomodoro-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.pomodoro-phase {
+  color: var(--text-2);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+}
+
+body.is-pomodoro-break .pomodoro-phase {
+  color: #34b392;
+}
+
+.pomodoro-time {
+  color: var(--text);
+  font-size: 44px;
+  font-weight: 250;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.pomodoro-round {
+  min-height: 15px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.pomodoro-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pomodoro-main {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 108px;
+  height: 36px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  transition:
+    transform var(--dur-1) var(--ease-out),
+    filter var(--dur-1) ease;
+}
+
+.pomodoro-main:hover {
+  filter: brightness(1.08);
+}
+
+.pomodoro-main:active {
+  transform: scale(0.96);
+}
+
+.pomodoro-settings {
+  display: flex;
+  gap: 20px;
+}
+
+.pomodoro-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.pomodoro-step-label {
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+.pomodoro-step-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.pomodoro-step-value {
+  min-width: 62px;
+  color: var(--text);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+/* ==========================================================================
+   倒数日面板
+   ========================================================================== */
+
+.panel-countdown {
+  gap: 12px;
+  padding: 4px 20px 16px;
+  max-height: min(60vh, 500px);
+}
+
+.countdown-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.countdown-form .field-inline {
+  flex-wrap: wrap;
+}
+
+.countdown-form .segment {
+  flex: none;
+  padding: 8px 12px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12.5px;
+}
+
+.countdown-form .segment[aria-pressed='true'] {
+  border-color: var(--accent-strong);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.countdown-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.countdown-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
+  animation: rise-in var(--dur-2) var(--ease-out) both;
+  transition: background var(--dur-1) ease;
+}
+
+.countdown-item:hover {
+  background: var(--surface);
+}
+
+.countdown-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.countdown-name {
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.countdown-date {
+  color: var(--text-3);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown-days {
+  flex: none;
+  color: var(--text-2);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown-days.is-today {
+  color: var(--accent);
 }

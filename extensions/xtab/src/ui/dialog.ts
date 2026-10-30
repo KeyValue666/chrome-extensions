@@ -1,5 +1,6 @@
 import { el } from '../lib/dom';
-import { createIcon } from '../lib/icons';
+import { tintOf } from '../lib/color';
+import { createIcon, type IconName } from '../lib/icons';
 import { GROUP_ICONS, LIMITS } from '../shared/constants';
 import { normalizeUrl } from '../lib/url';
 import type { GroupIconId, ShortcutGroup } from '../shared/types';
@@ -231,6 +232,193 @@ export interface ShortcutFormValue {
   groupId: string | null;
 }
 
+interface GroupPicker {
+  node: HTMLElement;
+  getValue(): string | null;
+  /** 弹窗关闭时调用：把挂在 body 上的菜单移除，避免泄漏 */
+  dispose(): void;
+}
+
+/**
+ * 分组选择器：替代原生 select。按钮显示当前分组的彩色图标 + 名称，
+ * 弹出菜单列出全部选项（选中项打勾），支持方向键 / Enter / Esc 键盘操作。
+ * 菜单挂在 body 上用 fixed 定位 —— dialog 有 overflow 裁剪，绝对定位会被切掉。
+ */
+function groupPicker(options: { groups: ShortcutGroup[]; value: string | null }): GroupPicker {
+  const entries: { id: string; name: string; icon: IconName; tint: string }[] = [
+    { id: '', name: '未分组', icon: 'inbox', tint: '' },
+    ...options.groups.map((group) => ({
+      id: group.id,
+      name: group.name,
+      icon: group.icon,
+      tint: tintOf(group.id),
+    })),
+  ];
+
+  let value = options.value ?? '';
+  let isOpen = false;
+  let focusIndex = -1;
+
+  const menu = el('div', {
+    class: 'group-picker-menu',
+    attrs: { role: 'listbox', 'aria-label': '选择分组', hidden: true },
+  });
+  document.body.append(menu);
+
+  const button = el('button', {
+    class: 'group-picker-button',
+    attrs: { type: 'button', 'aria-haspopup': 'listbox', 'aria-expanded': 'false' },
+    on: { click: () => (isOpen ? closeMenu() : openMenu()) },
+  });
+
+  const chip = (entry: { icon: IconName; tint: string }): HTMLElement => {
+    const chipNode = el('span', { class: 'group-picker-icon' }, [createIcon(entry.icon, 14)]);
+    if (entry.tint) {
+      chipNode.classList.add('has-tint');
+      chipNode.style.setProperty('--tile-bg', entry.tint);
+    }
+    return chipNode;
+  };
+
+  const renderButton = (): void => {
+    const current = entries.find((entry) => entry.id === value) ?? entries[0]!;
+    button.replaceChildren(
+      chip(current),
+      el('span', { class: 'group-picker-name', text: current.name }),
+      el('span', { class: 'caret', attrs: { 'aria-hidden': 'true' } }),
+    );
+  };
+
+  const syncFocus = (): void => {
+    [...menu.children].forEach((node, index) => {
+      node.classList.toggle('is-focused', index === focusIndex);
+    });
+  };
+
+  const move = (delta: 1 | -1): void => {
+    focusIndex = (focusIndex + delta + entries.length) % entries.length;
+    syncFocus();
+  };
+
+  const choose = (index: number): void => {
+    const entry = entries[index];
+    if (!entry) return;
+    value = entry.id;
+    [...menu.children].forEach((node, i) => {
+      node.classList.toggle('is-active', i === index);
+      node.setAttribute('aria-selected', String(i === index));
+    });
+    renderButton();
+    closeMenu();
+  };
+
+  const items = entries.map((entry, index) => {
+    const option = el(
+      'button',
+      {
+        class: `group-picker-option${entry.id === value ? ' is-active' : ''}`,
+        attrs: {
+          type: 'button',
+          role: 'option',
+          'aria-selected': String(entry.id === value),
+        },
+        on: {
+          click: () => choose(index),
+          mouseenter: () => {
+            focusIndex = index;
+            syncFocus();
+          },
+        },
+      },
+      [
+        chip(entry),
+        el('span', { class: 'group-picker-name', text: entry.name }),
+        el('span', { class: 'group-picker-check' }, [createIcon('check', 14)]),
+      ],
+    );
+    return option;
+  });
+  menu.replaceChildren(...items);
+
+  const onDocKey = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') {
+      event.stopPropagation();
+      closeMenu();
+      return;
+    }
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      move(1);
+    } else if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      move(-1);
+    } else if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      choose(focusIndex);
+    }
+  };
+
+  const onDocDown = (event: MouseEvent): void => {
+    const target = event.target as HTMLElement | null;
+    if (!target?.closest) return;
+    if (!target.closest('.group-picker') && !target.closest('.group-picker-menu')) closeMenu();
+  };
+
+  /** 菜单挂在 body 上，需要手动对齐按钮；下方放不下时向上翻 */
+  const positionMenu = (): void => {
+    const rect = button.getBoundingClientRect();
+    menu.style.width = `${rect.width}px`;
+    menu.hidden = false;
+    const height = menu.offsetHeight;
+    if (rect.bottom + 8 + height > window.innerHeight - 12) {
+      menu.style.top = `${Math.max(12, rect.top - height - 8)}px`;
+    } else {
+      menu.style.top = `${rect.bottom + 8}px`;
+    }
+    menu.style.left = `${rect.left}px`;
+  };
+
+  const onScroll = (): void => {
+    if (isOpen) positionMenu();
+  };
+
+  function openMenu(): void {
+    if (isOpen) return;
+    isOpen = true;
+    positionMenu();
+    button.setAttribute('aria-expanded', 'true');
+    focusIndex = Math.max(
+      0,
+      entries.findIndex((entry) => entry.id === value),
+    );
+    syncFocus();
+    document.addEventListener('keydown', onDocKey, true);
+    document.addEventListener('mousedown', onDocDown, true);
+    document.addEventListener('scroll', onScroll, true);
+  }
+
+  function closeMenu(): void {
+    if (!isOpen) return;
+    isOpen = false;
+    menu.hidden = true;
+    button.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('keydown', onDocKey, true);
+    document.removeEventListener('mousedown', onDocDown, true);
+    document.removeEventListener('scroll', onScroll, true);
+  }
+
+  renderButton();
+
+  return {
+    node: el('div', { class: 'group-picker' }, [button]),
+    getValue: () => value || null,
+    dispose: () => {
+      closeMenu();
+      menu.remove();
+    },
+  };
+}
+
 /** 新增/编辑快捷方式弹窗；onSubmit 返回错误文案表示校验失败，弹窗保持打开 */
 export function shortcutDialog(options: {
   title: string;
@@ -261,13 +449,7 @@ export function shortcutDialog(options: {
     },
   });
 
-  const groupSelect = el('select', { class: 'field-input' }, [
-    el('option', { text: '未分组', attrs: { value: '' } }),
-    ...options.groups.map((group) =>
-      el('option', { text: group.name, attrs: { value: group.id } }),
-    ),
-  ]);
-  groupSelect.value = initial.groupId ?? '';
+  const picker = groupPicker({ groups: options.groups, value: initial.groupId });
 
   const error = el('p', { class: 'dialog-error', attrs: { role: 'alert' } });
 
@@ -277,9 +459,9 @@ export function shortcutDialog(options: {
       titleInput,
     ]),
     el('label', { class: 'field' }, [el('span', { class: 'field-label', text: '网址' }), urlInput]),
-    el('label', { class: 'field' }, [
+    el('div', { class: 'field' }, [
       el('span', { class: 'field-label', text: '分组' }),
-      groupSelect,
+      picker.node,
     ]),
     error,
   ]);
@@ -292,11 +474,11 @@ export function shortcutDialog(options: {
       urlInput.focus();
       return;
     }
-    const groupValue = groupSelect.value;
+    const groupValue = picker.getValue();
     const failure = options.onSubmit({
       title: titleInput.value.trim(),
       url,
-      groupId: groupValue ? groupValue : null,
+      groupId: groupValue,
     });
     if (failure) {
       error.textContent = failure;
@@ -315,6 +497,7 @@ export function shortcutDialog(options: {
   const close = openModal({
     title: options.title,
     body,
+    onClose: () => picker.dispose(),
     footer: el('footer', { class: 'dialog-footer' }, [
       el('button', {
         class: 'button',

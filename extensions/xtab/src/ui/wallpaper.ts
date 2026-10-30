@@ -1,4 +1,4 @@
-import { findPreset, LIMITS } from '../shared/constants';
+import { findAccent, findPreset, LIMITS } from '../shared/constants';
 import { getWallpaper, putWallpaper, deleteWallpaper } from '../shared/wallpaper-store';
 import type { AppState, Settings, ThemeMode } from '../shared/types';
 
@@ -45,6 +45,12 @@ export async function applyAppearance(state: AppState): Promise<void> {
 
   document.documentElement.dataset.theme = theme;
   document.documentElement.style.setProperty('--dim-alpha', (settings.dim / 100).toFixed(2));
+  // 强调色跟随主题取值，派生的浅色底由 CSS color-mix 从 --accent 计算
+  const accent = findAccent(settings.accentId);
+  document.documentElement.style.setProperty(
+    '--accent',
+    theme === 'light' ? accent.light : accent.dark,
+  );
   document.body.classList.toggle('is-blurred', settings.blur);
   document.body.classList.toggle('is-minimal', settings.minimal);
   document.body.classList.toggle('is-dock-autohide', settings.sidebarCollapsed);

@@ -29,6 +29,8 @@ export type GroupIconId =
 
 export interface Settings {
   theme: ThemeMode;
+  /** 强调色 id，见 ACCENT_PRESETS */
+  accentId: string;
   wallpaperKind: WallpaperKind;
   /** 内置壁纸 id，见 WALLPAPER_PRESETS */
   presetId: string;
@@ -45,6 +47,14 @@ export interface Settings {
   sidebarCollapsed: boolean;
   /** 当前搜索引擎 id，见 SEARCH_ENGINES */
   searchEngine: string;
+  /** 日期行显示农历与节日 */
+  lunarEnabled: boolean;
+  /** 搜索框下拉显示最近搜索 */
+  searchHistoryEnabled: boolean;
+  /** 番茄钟专注时长（分钟） */
+  pomodoroFocus: number;
+  /** 番茄钟休息时长（分钟） */
+  pomodoroBreak: number;
 }
 
 export interface Shortcut {
@@ -73,7 +83,7 @@ export interface ShortcutGroup {
 
 /** 侧边栏 -> 快捷方式区的筛选条件 */
 export interface ShortcutFilter {
-  kind: 'all' | 'ungrouped' | 'group';
+  kind: 'ungrouped' | 'group';
   groupId: string | null;
 }
 
@@ -82,6 +92,18 @@ export interface TodoItem {
   text: string;
   done: boolean;
   createdAt: number;
+}
+
+/**
+ * 倒数日：date 是 YYYY-MM-DD。
+ * anniversary 为 true 时按「每年这一天」循环（生日、纪念日），
+ * 为 false 时是单向倒计时（截止日期、出发日）。
+ */
+export interface CountdownItem {
+  id: string;
+  name: string;
+  date: string;
+  anniversary: boolean;
 }
 
 export interface AppState {
@@ -97,6 +119,9 @@ export interface AppState {
   grid: string[];
   todos: TodoItem[];
   note: string;
+  /** 最近搜索词，新的在前，上限 MAX_SEARCH_HISTORY */
+  searchHistory: string[];
+  countdowns: CountdownItem[];
 }
 
 export interface SearchEngine {

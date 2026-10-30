@@ -64,7 +64,7 @@ export default defineConfig(({ mode }) => {
       emptyOutDir: !isDev,
       target: 'chrome110',
       rollupOptions: {
-        input: { index: `${rootDir}index.html` },
+        input: { index: `${rootDir}index.html`, popup: `${rootDir}popup.html` },
       },
     },
     plugins: [copyManifestPlugin(), ...(isDev ? [liveReloadPlugin()] : [])],

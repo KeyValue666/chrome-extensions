@@ -1,7 +1,12 @@
 import {
+  ACCENT_PRESETS,
+  DEFAULT_ACCENT_ID,
   DEFAULT_GROUP_ICON,
   DEFAULT_SETTINGS,
   LIMITS,
+  MAX_COUNTDOWNS,
+  MAX_SEARCH_HISTORY,
+  POMODORO_LIMITS,
   SEARCH_ENGINES,
   STATE_VERSION,
   WALLPAPER_PRESETS,
@@ -9,13 +14,16 @@ import {
 } from './constants';
 import { normalizeText } from '../lib/list';
 import { normalizeUrl } from '../lib/url';
+import { parseDateKey } from '../lib/time';
 import { uid } from '../lib/dom';
 import type {
   AppState,
+  CountdownItem,
   Folder,
   GroupIconId,
   Settings,
   Shortcut,
+  ShortcutFilter,
   ShortcutGroup,
   TodoItem,
   ThemeMode,
@@ -23,7 +31,8 @@ import type {
 
 const THEMES: ThemeMode[] = ['auto', 'light', 'dark'];
 
-const MAX_SHORTCUTS = 200;
+/** 快捷方式总条数上限（含文件夹内的）：弹出面板新增时也要守这条线 */
+export const MAX_SHORTCUTS = 300;
 const MAX_GROUPS = 30;
 const MAX_FOLDERS = 50;
 const MAX_TODOS = 500;
@@ -48,6 +57,22 @@ const asInt = (value: unknown, fallback: number, min: number, max: number): numb
 };
 
 /** 首次打开的示例数据：真实可用的站点，用户可直接删除 */
+/**
+ * 首屏落在哪个分类：优先「未分组」首页（它承载内置应用与文件夹）；
+ * 首页空着时退到第一个有内容的分组，避免一进来看到空网格。
+ */
+export function initialFilter(state: AppState): ShortcutFilter {
+  const homeHasContent =
+    state.folders.length > 0 ||
+    state.shortcuts.some((item) => !item.folderId && item.groupId === null);
+  if (homeHasContent) return { kind: 'ungrouped', groupId: null };
+
+  const group = state.groups.find(
+    (item) => !item.hidden && state.shortcuts.some((shortcut) => shortcut.groupId === item.id),
+  );
+  return group ? { kind: 'group', groupId: group.id } : { kind: 'ungrouped', groupId: null };
+}
+
 export function createDefaultState(): AppState {
   const groups: ShortcutGroup[] = [
     { id: 'g-common', name: '常用', icon: 'star', hidden: false },
@@ -78,6 +103,8 @@ export function createDefaultState(): AppState {
     grid: shortcuts.map((shortcut) => shortcut.id),
     todos: [],
     note: '',
+    searchHistory: [],
+    countdowns: [],
   };
 }
 
@@ -89,6 +116,9 @@ export function normalizeSettings(raw: unknown): Settings {
 
   return {
     theme: THEMES.includes(theme) ? theme : DEFAULT_SETTINGS.theme,
+    accentId: ACCENT_PRESETS.some((accent) => accent.id === source.accentId)
+      ? asString(source.accentId)
+      : DEFAULT_ACCENT_ID,
     wallpaperKind: source.wallpaperKind === 'custom' ? 'custom' : 'preset',
     presetId: WALLPAPER_PRESETS.some((preset) => preset.id === presetId)
       ? presetId
@@ -102,6 +132,23 @@ export function normalizeSettings(raw: unknown): Settings {
     searchEngine: SEARCH_ENGINES.some((engine) => engine.id === engineId)
       ? engineId
       : DEFAULT_SETTINGS.searchEngine,
+    lunarEnabled: asBoolean(source.lunarEnabled, DEFAULT_SETTINGS.lunarEnabled),
+    searchHistoryEnabled: asBoolean(
+      source.searchHistoryEnabled,
+      DEFAULT_SETTINGS.searchHistoryEnabled,
+    ),
+    pomodoroFocus: asInt(
+      source.pomodoroFocus,
+      POMODORO_LIMITS.focus.default,
+      POMODORO_LIMITS.focus.min,
+      POMODORO_LIMITS.focus.max,
+    ),
+    pomodoroBreak: asInt(
+      source.pomodoroBreak,
+      POMODORO_LIMITS.break.default,
+      POMODORO_LIMITS.break.min,
+      POMODORO_LIMITS.break.max,
+    ),
   };
 }
 
@@ -150,6 +197,19 @@ export function normalizeTodo(raw: unknown): TodoItem | null {
     text,
     done: asBoolean(raw.done, false),
     createdAt: asInt(raw.createdAt, Date.now(), 0, Number.MAX_SAFE_INTEGER),
+  };
+}
+
+export function normalizeCountdown(raw: unknown): CountdownItem | null {
+  if (!isRecord(raw)) return null;
+  const name = normalizeText(asString(raw.name)).slice(0, LIMITS.countdownName);
+  const date = asString(raw.date);
+  if (!name || !parseDateKey(date)) return null;
+  return {
+    id: asString(raw.id) || uid(),
+    name,
+    date,
+    anniversary: asBoolean(raw.anniversary, false),
   };
 }
 
@@ -242,6 +302,26 @@ export function normalizeState(raw: unknown): AppState {
     if (todos.length >= MAX_TODOS) break;
   }
 
+  const searchHistory: string[] = [];
+  const seenQueries = new Set<string>();
+  for (const item of Array.isArray(source.searchHistory) ? source.searchHistory : []) {
+    const query = normalizeText(asString(item)).slice(0, LIMITS.searchQuery);
+    if (!query || seenQueries.has(query)) continue;
+    searchHistory.push(query);
+    seenQueries.add(query);
+    if (searchHistory.length >= MAX_SEARCH_HISTORY) break;
+  }
+
+  const countdowns: CountdownItem[] = [];
+  const seenCountdownIds = new Set<string>();
+  for (const item of Array.isArray(source.countdowns) ? source.countdowns : []) {
+    const countdown = normalizeCountdown(item);
+    if (!countdown || seenCountdownIds.has(countdown.id)) continue;
+    countdowns.push(countdown);
+    seenCountdownIds.add(countdown.id);
+    if (countdowns.length >= MAX_COUNTDOWNS) break;
+  }
+
   return {
     version: STATE_VERSION,
     settings: normalizeSettings(source.settings),
@@ -251,6 +331,8 @@ export function normalizeState(raw: unknown): AppState {
     grid,
     todos,
     note: asString(source.note).slice(0, LIMITS.noteLength),
+    searchHistory,
+    countdowns,
   };
 }
 
@@ -310,6 +392,36 @@ export function removeShortcut(state: AppState, id: string): void {
   if (target?.folderId) {
     const remaining = state.shortcuts.filter((item) => item.folderId === target.folderId);
     if (remaining.length < 2) dissolveFolder(state, target.folderId);
+  }
+}
+
+/**
+ * 批量删除编辑模式下选中的网格项。
+ * tokens 既可以是快捷方式 id，也可以是文件夹 token（`f:<id>`）：文件夹按「解散」处理，
+ * 里面的成员回到网格而不是被删掉；成员被删到只剩 1 个的文件夹同样自动解散。
+ */
+export function removeTokens(state: AppState, tokens: readonly string[]): void {
+  const ids = new Set<string>();
+  const folderIds = new Set<string>();
+  for (const token of tokens) {
+    if (isFolderToken(token)) folderIds.add(folderTokenId(token));
+    else ids.add(token);
+  }
+  const touchedFolders = new Set<string>();
+  for (const id of ids) {
+    const folderId = state.shortcuts.find((item) => item.id === id)?.folderId;
+    if (folderId) touchedFolders.add(folderId);
+  }
+
+  state.shortcuts = state.shortcuts.filter((item) => !ids.has(item.id));
+  state.grid = state.grid.filter((token) => !ids.has(token));
+
+  for (const folderId of folderIds) dissolveFolder(state, folderId);
+  for (const folderId of touchedFolders) {
+    if (!state.folders.some((folder) => folder.id === folderId)) continue;
+    if (state.shortcuts.filter((item) => item.folderId === folderId).length < 2) {
+      dissolveFolder(state, folderId);
+    }
   }
 }
 
@@ -461,4 +573,40 @@ export function removeTodo(state: AppState, id: string): void {
 
 export function clearDoneTodos(state: AppState): void {
   state.todos = state.todos.filter((item) => !item.done);
+}
+
+/* ---------- 搜索历史 ---------- */
+
+export function pushSearchHistory(state: AppState, query: string): void {
+  const text = normalizeText(query).slice(0, LIMITS.searchQuery);
+  if (!text) return;
+  state.searchHistory = [text, ...state.searchHistory.filter((item) => item !== text)].slice(
+    0,
+    MAX_SEARCH_HISTORY,
+  );
+}
+
+export function removeSearchHistory(state: AppState, query: string): void {
+  state.searchHistory = state.searchHistory.filter((item) => item !== query);
+}
+
+export function clearSearchHistory(state: AppState): void {
+  state.searchHistory = [];
+}
+
+/* ---------- 倒数日 ---------- */
+
+export function addCountdown(
+  state: AppState,
+  input: { name: string; date: string; anniversary: boolean },
+): CountdownItem | null {
+  const countdown = normalizeCountdown({ ...input, id: uid() });
+  if (!countdown) return null;
+  if (state.countdowns.length >= MAX_COUNTDOWNS) return null;
+  state.countdowns.push(countdown);
+  return countdown;
+}
+
+export function removeCountdown(state: AppState, id: string): void {
+  state.countdowns = state.countdowns.filter((item) => item.id !== id);
 }

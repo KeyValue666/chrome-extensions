@@ -26,7 +26,9 @@
   --panel-solid: rgba(22, 24, 32, 0.94);
 
   --accent: #6ea8ff;
-  --accent-soft: rgba(110, 168, 255, 0.16);
+  /* 派生自 --accent：改强调色只需 JS 重写 --accent 一个变量 */
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+  --accent-strong: color-mix(in srgb, var(--accent) 55%, transparent);
   --danger: #ff6b6b;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.18), 0 10px 30px rgba(0, 0, 0, 0.22);
@@ -68,7 +70,6 @@
   --panel-solid: rgba(252, 252, 254, 0.97);
 
   --accent: #2f6fed;
-  --accent-soft: rgba(47, 111, 237, 0.12);
   --shadow-1: 0 1px 2px rgba(16, 18, 24, 0.06), 0 10px 30px rgba(16, 18, 24, 0.1);
   --shadow-2: 0 2px 8px rgba(16, 18, 24, 0.1), 0 24px 60px rgba(16, 18, 24, 0.16);
 
@@ -180,89 +181,183 @@ body.is-blurred .bg {
 /* ---------- 总体布局 ---------- */
 
 .app {
-  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
   padding-left: var(--dock-space);
   transition: padding-left var(--dur-3) var(--ease-out);
 }
 
 .stage {
   display: flex;
+  flex: 1;
   justify-content: center;
-  min-height: 100vh;
-  padding: 0 clamp(20px, 4vw, 56px) 64px;
+  min-height: 0;
+  padding: 0 clamp(20px, 4vw, 56px) 20px;
 }
 
 .content {
   display: flex;
+  flex: 1;
   flex-direction: column;
-  gap: clamp(28px, 4vh, 44px);
-  width: min(940px, 100%);
-  padding-top: clamp(56px, 15vh, 168px);
+  min-height: 0;
+  gap: clamp(26px, 4.5vh, 46px);
+  width: min(1040px, 100%);
+  padding-top: clamp(36px, 7.5vh, 88px);
 }
 
-/* ---------- 时钟 ---------- */
+/* ---------- 时钟 + 搜索（顶置左钟右搜布局） ---------- */
 
 .hero {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: clamp(20px, 3vh, 30px);
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: clamp(24px, 4vw, 56px);
   animation: rise-in var(--dur-3) var(--ease-out) both;
+  /* rise-in 的填充帧让 hero 带着层叠上下文；不抬高的话，
+     搜索框下拉菜单（引擎/历史）会被后面网格里的图块盖住 */
+  position: relative;
+  z-index: 5;
 }
 
+/* 悬停位移放在内部 .clock 上：按钮盒子不动，指针在按钮边缘不会因
+   「移出→复位→移入」来回横跳（表现为数字抖动） */
 .clock-button {
   display: flex;
+  flex: none;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
-  padding: 2px 14px 8px;
+  padding: 2px 14px 6px 0;
   border: 0;
   border-radius: var(--radius-lg);
   background: none;
   color: inherit;
+  text-align: left;
   cursor: pointer;
-  transition: transform var(--dur-2) var(--ease-out);
 }
 
-.clock-button:hover {
-  transform: translateY(-2px);
-}
-
-.clock-button:active {
-  transform: translateY(0) scale(0.995);
+.clock-button:active .clock {
+  transform: translateY(-1px) scale(0.997);
 }
 
 .clock {
-  color: var(--text);
-  font-size: clamp(66px, 10.5vw, 146px);
-  font-weight: 260;
+  position: relative;
+  display: inline-flex;
+  align-items: baseline;
+  color: transparent;
+  font-size: clamp(58px, 7.2vw, 100px);
+  font-weight: 210;
   font-variant-numeric: tabular-nums;
-  line-height: 0.98;
-  letter-spacing: -0.045em;
-  text-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+  line-height: 1.06;
+  filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.3));
   transition:
     font-size var(--dur-2) var(--ease-out),
-    opacity var(--dur-2) ease;
+    transform var(--dur-2) var(--ease-out),
+    filter var(--dur-2) ease;
+}
+
+/* 渐变裁剪必须落在每个数字自身：放在父元素上会被 overflow/filter 组合渲染成乱字形 */
+.digit-num {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1) 26%, rgba(255, 255, 255, 0.6) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+[data-theme='light'] .digit-num {
+  background: linear-gradient(180deg, rgba(16, 18, 24, 0.96) 26%, rgba(16, 18, 24, 0.58) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .clock.clock-long {
-  font-size: clamp(44px, 7vw, 94px);
-  letter-spacing: -0.035em;
+  font-size: clamp(42px, 5vw, 68px);
+}
+
+.clock-button:hover .clock {
+  transform: translateY(-3px);
+  filter: drop-shadow(0 20px 46px rgba(0, 0, 0, 0.36)) brightness(1.06);
+}
+
+/* 数字槽位：flex 布局下 letter-spacing 失效，用负 margin 收紧字距 */
+.digit {
+  position: relative;
+  display: inline-block;
+  overflow: hidden;
+}
+
+.digit + .digit {
+  margin-left: -0.03em;
+}
+
+.digit-num {
+  display: inline-block;
+  animation: digit-in var(--dur-2) var(--ease-out) both;
+}
+
+.digit-num.is-out {
+  position: absolute;
+  top: 0;
+  left: 0;
+  animation: digit-out var(--dur-2) var(--ease-out) both;
+}
+
+/* 冒号呼吸：缓慢明暗，让时钟「活着」；reduced-motion 下自动停 */
+.digit-num.colon-char {
+  animation: colon-breathe 2.4s ease-in-out infinite;
+}
+
+.digit-num.colon-char.is-out {
+  animation: digit-out var(--dur-2) var(--ease-out) both;
+}
+
+.clock-meridiem {
+  margin-left: 0.16em;
+  font-size: 0.3em;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  opacity: 0.55;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 1) 26%, rgba(255, 255, 255, 0.6) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+[data-theme='light'] .clock-meridiem {
+  background: linear-gradient(180deg, rgba(16, 18, 24, 0.96) 26%, rgba(16, 18, 24, 0.58) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
 }
 
 .date {
+  max-width: 46vw;
+  overflow: hidden;
   color: var(--text-2);
   font-size: clamp(12.5px, 1.1vw, 14px);
   font-weight: 450;
   letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color var(--dur-2) ease;
+  animation: rise-in var(--dur-3) var(--ease-out) 90ms both;
+}
+
+.clock-button:hover .date {
+  color: var(--text);
 }
 
 /* ---------- 搜索 ---------- */
 
 .search {
   display: flex;
-  justify-content: center;
-  width: 100%;
+  justify-content: flex-end;
+  width: min(560px, 100%);
+  margin-left: auto;
+  animation: rise-in var(--dur-3) var(--ease-out) 140ms both;
 }
 
 .search-form {
@@ -270,7 +365,7 @@ body.is-blurred .bg {
   display: flex;
   align-items: center;
   gap: 8px;
-  width: min(640px, 100%);
+  width: 100%;
   padding: 5px 6px 5px 18px;
   border: 1px solid var(--stroke-strong);
   border-radius: 999px;
@@ -464,6 +559,106 @@ body.is-blurred .bg {
   font-weight: 600;
 }
 
+/* 搜索历史下拉：挂在搜索框内，与引擎菜单同层 */
+.search-suggest {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  right: 0;
+  z-index: 25;
+  padding: 6px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  background: var(--panel-solid);
+  backdrop-filter: blur(30px) saturate(1.4);
+  box-shadow: var(--shadow-2);
+  transform-origin: top left;
+  animation: pop-in var(--dur-2) var(--ease-out) both;
+}
+
+.search-suggest[hidden] {
+  display: none;
+}
+
+.suggest-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px 6px;
+  border-bottom: 1px solid var(--stroke);
+  margin-bottom: 3px;
+}
+
+.suggest-title {
+  color: var(--text-3);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+}
+
+.suggest-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-1) ease,
+    color var(--dur-1) ease;
+}
+
+.suggest-item:hover,
+.suggest-item.is-active {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.suggest-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  color: var(--text-3);
+}
+
+.suggest-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggest-remove {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: var(--text-3);
+  opacity: 0;
+  transition:
+    opacity var(--dur-1) ease,
+    color var(--dur-1) ease;
+}
+
+.suggest-item:hover .suggest-remove,
+.suggest-item.is-active .suggest-remove {
+  opacity: 1;
+}
+
+.suggest-remove:hover {
+  color: var(--danger);
+}
+
 /* ---------- 工具条 ---------- */
 
 .toolbar {
@@ -565,6 +760,28 @@ body.is-minimal .app {
   padding-left: 0;
 }
 
+/* 极简模式回归居中构图：时钟在上、搜索在下 */
+body.is-minimal .hero {
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(20px, 3vh, 30px);
+}
+
+body.is-minimal .clock-button {
+  align-items: center;
+  text-align: center;
+  padding-right: 14px;
+}
+
+body.is-minimal .date {
+  max-width: none;
+}
+
+body.is-minimal .search {
+  justify-content: center;
+  margin-left: 0;
+}
+
 body.is-minimal .content {
   gap: 32px;
   padding-top: clamp(96px, 32vh, 300px);
@@ -655,6 +872,35 @@ body.is-minimal .minimal-hint {
   }
 }
 
+/* 时钟翻牌：新字从下方滑入，旧字向上滑出 */
+@keyframes digit-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.58em);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes digit-out {
+  to {
+    opacity: 0;
+    transform: translateY(-0.58em);
+  }
+}
+
+@keyframes colon-breathe {
+  0%,
+  100% {
+    opacity: 0.38;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
 /* ---------- 可访问性 ---------- */
 
 .visually-hidden {
@@ -688,17 +934,50 @@ body.is-minimal .minimal-hint {
   }
 }
 
+@media (max-width: 860px) {
+  .hero {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 24px;
+  }
+
+  .clock-button {
+    align-items: center;
+    text-align: center;
+    padding-right: 14px;
+  }
+
+  .date {
+    max-width: none;
+    white-space: normal;
+  }
+
+  .search {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
 @media (max-width: 640px) {
   :root {
     --dock-space: 0px;
   }
 
+  /* 小屏回到纵向滚动：Dock 落底、网格换行，滚轮分页只属于桌面 */
   .app {
+    height: auto;
+    overflow: visible;
     padding-left: 0;
     padding-bottom: 84px;
   }
 
+  .stage {
+    min-height: 100vh;
+    padding-bottom: 0;
+  }
+
   .content {
+    min-height: 0;
     padding-top: clamp(32px, 10vh, 72px);
     padding-bottom: 96px;
   }

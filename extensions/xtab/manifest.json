@@ -1,14 +1,22 @@
 {
   "manifest_version": 3,
   "name": "XTab",
-  "version": "0.1.0",
-  "description": "离线可用的新标签页：时钟、聚合搜索、快捷方式、壁纸、待办与便签。",
+  "version": "0.2.0",
+  "description": "离线可用的新标签页：时钟、聚合搜索、快捷方式、壁纸、待办、便签、番茄钟与倒数日。",
   "minimum_chrome_version": "110",
   "offline_enabled": true,
   "chrome_url_overrides": {
     "newtab": "index.html"
   },
-  "permissions": ["storage", "favicon"],
+  "action": {
+    "default_title": "添加到 XTab",
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "32": "icons/icon-32.png"
+    }
+  },
+  "permissions": ["storage", "favicon", "activeTab"],
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",

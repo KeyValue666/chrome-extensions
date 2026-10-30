@@ -1,0 +1,362 @@
+/* ==========================================================================
+   扩展图标弹出面板
+   只放这一处用得到的样式：不引 base.css，避免把整页布局带进 336px 的小窗。
+   令牌与主界面同源（深色为默认，浅色由 html[data-theme='light'] 覆盖）。
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'PingFang SC',
+    'Microsoft YaHei UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --text: rgba(255, 255, 255, 0.95);
+  --text-2: rgba(255, 255, 255, 0.66);
+  --text-3: rgba(255, 255, 255, 0.4);
+
+  --surface: rgba(255, 255, 255, 0.06);
+  --surface-hover: rgba(255, 255, 255, 0.1);
+  --stroke: rgba(255, 255, 255, 0.1);
+  --stroke-strong: rgba(255, 255, 255, 0.18);
+  --bg: #14161e;
+
+  --accent: #6ea8ff;
+  --accent-soft: color-mix(in srgb, var(--accent) 18%, transparent);
+  --accent-strong: color-mix(in srgb, var(--accent) 52%, transparent);
+  --danger: #ff6b6b;
+  --ok: #4fd1a5;
+
+  --radius-md: 12px;
+  --radius-sm: 9px;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --dur-1: 120ms;
+  --dur-2: 200ms;
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+
+  --text: rgba(16, 18, 24, 0.95);
+  --text-2: rgba(16, 18, 24, 0.78);
+  --text-3: rgba(16, 18, 24, 0.5);
+
+  --surface: rgba(16, 18, 24, 0.05);
+  --surface-hover: rgba(16, 18, 24, 0.09);
+  --stroke: rgba(16, 18, 24, 0.12);
+  --stroke-strong: rgba(16, 18, 24, 0.2);
+  --bg: #fbfbfd;
+
+  --accent: #2f6fed;
+  --ok: #0e9f6e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  width: 336px;
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font-family: inherit;
+}
+
+.pop {
+  display: grid;
+  gap: 11px;
+  padding: 13px 14px 14px;
+}
+
+/* ---------- 头部 ---------- */
+
+.pop-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pop-logo {
+  display: block;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+}
+
+.pop-heading {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--text-2);
+}
+
+/* ---------- 站点卡片 ---------- */
+
+.site {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.site-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--surface-hover);
+  color: var(--text-2);
+  font-size: 15px;
+  font-weight: 600;
+  overflow: hidden;
+}
+
+.site-icon img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.site-fields {
+  display: grid;
+  flex: 1;
+  gap: 2px;
+  min-width: 0;
+}
+
+.field {
+  width: 100%;
+  min-width: 0;
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  background: none;
+  color: var(--text);
+  outline: none;
+  transition: border-color var(--dur-1) ease;
+}
+
+.field-title {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.field-url {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-3);
+}
+
+.field:focus {
+  border-bottom-color: var(--accent-strong);
+}
+
+.field-url.is-invalid {
+  color: var(--danger);
+}
+
+/* ---------- 分组选择 ---------- */
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border: 1px solid var(--stroke);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition:
+    background var(--dur-1) ease,
+    border-color var(--dur-1) ease,
+    color var(--dur-1) ease;
+}
+
+.chip:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.chip.is-active {
+  border-color: var(--accent-strong);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* ---------- 提示与主按钮 ---------- */
+
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-2);
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+
+.notice.is-warn {
+  color: #ffb4a8;
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+}
+
+.notice-link {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-size: 11.5px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.btn {
+  height: 34px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background var(--dur-1) ease,
+    opacity var(--dur-1) ease,
+    transform var(--dur-1) var(--ease-out);
+}
+
+.btn:active {
+  transform: scale(0.985);
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background: color-mix(in srgb, var(--accent) 88%, #fff);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.btn-ghost {
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+.btn-ghost:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.pop-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--text-3);
+  font-size: 11px;
+}
+
+/* ---------- 成功态 ---------- */
+
+.done {
+  display: grid;
+  gap: 10px;
+  justify-items: center;
+  padding: 14px 6px 6px;
+  text-align: center;
+}
+
+.done-badge {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--ok) 18%, transparent);
+  color: var(--ok);
+}
+
+.done-text {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.done-sub {
+  margin: 0;
+  color: var(--text-3);
+  font-size: 11.5px;
+}
+
+.done-actions {
+  display: flex;
+  width: 100%;
+  gap: 8px;
+}
+
+.done-actions .btn {
+  flex: 1;
+}
+
+/* ---------- 骨架屏 ---------- */
+
+.skeleton {
+  height: 56px;
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    100deg,
+    var(--surface) 20%,
+    var(--surface-hover) 42%,
+    var(--surface) 64%
+  );
+  background-size: 220% 100%;
+  animation: shimmer 1.1s linear infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 120% 0;
+  }
+
+  to {
+    background-position: -20% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}

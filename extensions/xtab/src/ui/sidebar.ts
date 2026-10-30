@@ -1,6 +1,7 @@
 import type { AppContext } from '../shared/context';
 import { DEFAULT_GROUP_ICON, GROUP_ICONS } from '../shared/constants';
 import { addGroup, removeGroup, updateGroup } from '../shared/state';
+import { tintOf } from '../lib/color';
 import { el } from '../lib/dom';
 import { createIcon, type IconName } from '../lib/icons';
 import { confirmDialog, groupDialog, hiddenGroupsDialog } from './dialog';
@@ -10,24 +11,18 @@ import type { ShortcutFilter, ShortcutGroup } from '../shared/types';
 export interface SidebarHandle {
   render(): void;
   getFilter(): ShortcutFilter;
+  /** 按顺序循环切换分类（1 下一个 / -1 上一个），等效于点击 Dock 项 */
+  cycle(direction: 1 | -1): void;
 }
 
 interface SidebarOptions {
-  /** 筛选条件变化时通知快捷方式区 */
-  onChange(filter: ShortcutFilter): void;
+  /** 首屏分类，由 main 依据数据决定（首页空着时退到有内容的分组） */
+  initialFilter?: ShortcutFilter;
+  /** 筛选条件变化时通知快捷方式区；direction 供入场动画定方向 */
+  onChange(filter: ShortcutFilter, direction?: -1 | 0 | 1): void;
 }
 
-const ALL_FILTER: ShortcutFilter = { kind: 'all', groupId: null };
-const UNGROUPED_FILTER: ShortcutFilter = { kind: 'ungrouped', groupId: null };
-
-/** 分组图标底色：按 id 稳定取一个色相，同一分组刷新多少次都是同一个颜色 */
-function tintOf(seed: string): string {
-  let hash = 0;
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) % 360;
-  }
-  return `linear-gradient(150deg, hsl(${hash} 74% 64%), hsl(${(hash + 32) % 360} 70% 48%))`;
-}
+const HOME_FILTER: ShortcutFilter = { kind: 'ungrouped', groupId: null };
 
 interface DockItemOptions {
   label: string;
@@ -35,14 +30,15 @@ interface DockItemOptions {
   meta?: string;
   icon: IconName;
   active?: boolean;
-  /** 图标底色；不传则是中性半透明块（全部 / 未分组 / 新建） */
+  /** 图标底色；不传则是中性半透明块（未分组 / 新建） */
   tint?: string;
   onClick(): void;
   onMenu?(x: number, y: number): void;
 }
 
 /**
- * 左侧 Dock：图标 + 悬停气泡标签。
+ * 左侧 Dock：图标 + 悬停气泡标签（气泡挂在 body 上用 fixed 定位，
+ * 因为 Dock 本身可滚动，内部 absolute 元素会被裁剪）。
  * 右键（触屏长按）才出操作菜单 —— 平时不显示任何按钮，避免图标被小按钮切碎。
  */
 function dockItem(options: DockItemOptions): HTMLElement {
@@ -60,14 +56,13 @@ function dockItem(options: DockItemOptions): HTMLElement {
       },
       on: { click: options.onClick },
     },
-    [
-      tile,
-      el('span', { class: 'dock-tip' }, [
-        el('span', { class: 'dock-tip-name', text: options.label }),
-        ...(options.meta ? [el('span', { class: 'dock-tip-meta', text: options.meta })] : []),
-      ]),
-    ],
+    [tile],
   );
+
+  item.addEventListener('pointerenter', () => showDockTip(item, options.label, options.meta));
+  item.addEventListener('pointerleave', hideDockTip);
+  item.addEventListener('focus', () => showDockTip(item, options.label, options.meta));
+  item.addEventListener('blur', hideDockTip);
 
   if (options.onMenu) {
     const openMenu = (x: number, y: number): void => options.onMenu?.(x, y);
@@ -86,6 +81,37 @@ function dockItem(options: DockItemOptions): HTMLElement {
   }
 
   return item;
+}
+
+/* ---------- 共享气泡：整个 Dock 只有一个，跟随悬停的图标 ---------- */
+
+let dockTipNode: HTMLElement | null = null;
+let dockTipItem: HTMLElement | null = null;
+
+function showDockTip(item: HTMLElement, label: string, meta?: string): void {
+  if (!dockTipNode) return;
+  dockTipNode.replaceChildren(
+    el('span', { class: 'dock-tip-name', text: label }),
+    ...(meta ? [el('span', { class: 'dock-tip-meta', text: meta })] : []),
+  );
+  dockTipNode.hidden = false;
+  const rect = item.getBoundingClientRect();
+  // 小屏 Dock 落在底部横排，气泡显示在图标上方
+  const above = window.matchMedia('(max-width: 640px)').matches;
+  dockTipNode.classList.toggle('is-above', above);
+  dockTipNode.style.left = above ? `${rect.left + rect.width / 2}px` : `${rect.right + 14}px`;
+  dockTipNode.style.top = above ? `${rect.top}px` : `${rect.top + rect.height / 2}px`;
+  dockTipItem = item;
+  requestAnimationFrame(() => {
+    if (dockTipItem === item) dockTipNode?.classList.add('is-visible');
+  });
+}
+
+function hideDockTip(): void {
+  dockTipItem = null;
+  if (!dockTipNode) return;
+  dockTipNode.classList.remove('is-visible');
+  dockTipNode.hidden = true;
 }
 
 /**
@@ -162,7 +188,7 @@ function attachMagnification(dock: HTMLElement): void {
 }
 
 /**
- * 左侧 Dock 导航：全部 / 未分组 / 分组列表。
+ * 左侧 Dock 导航：未分组（首页）/ 分组列表。
  * 分组支持新建、重命名、换图标、隐藏、删除；右键或长按才出菜单。
  */
 export function initSidebar(
@@ -170,15 +196,39 @@ export function initSidebar(
   ctx: AppContext,
   options: SidebarOptions,
 ): SidebarHandle {
-  let filter: ShortcutFilter = ALL_FILTER;
+  let filter: ShortcutFilter = options.initialFilter ?? HOME_FILTER;
 
-  function pickFilter(next: ShortcutFilter): void {
+  // 悬停气泡：挂 body，避免被 Dock 的滚动容器裁剪
+  const tip = el('div', { class: 'dock-tip', attrs: { role: 'tooltip', hidden: true } });
+  document.body.append(tip);
+  dockTipNode = tip;
+
+  /** Dock 顶到下的分类顺序：未分组（首页）→ 各可见分组 */
+  function orderedFilters(): ShortcutFilter[] {
+    const groups = ctx.getState().groups.filter((group) => !group.hidden);
+    return [
+      HOME_FILTER,
+      ...groups.map((group): ShortcutFilter => ({ kind: 'group', groupId: group.id })),
+    ];
+  }
+
+  function pickFilter(next: ShortcutFilter, direction: -1 | 0 | 1 = 0): void {
     if (next.kind === filter.kind && (next.kind !== 'group' || next.groupId === filter.groupId)) {
       return;
     }
     filter = next;
-    options.onChange(next);
+    options.onChange(next, direction);
     render();
+  }
+
+  function cycle(direction: 1 | -1): void {
+    const list = orderedFilters();
+    const index = list.findIndex(
+      (item) => item.kind === filter.kind && item.groupId === filter.groupId,
+    );
+    if (index < 0) return;
+    const next = list[(index + direction + list.length) % list.length];
+    if (next) pickFilter(next, direction);
   }
 
   function editGroup(group: ShortcutGroup): void {
@@ -233,7 +283,7 @@ export function initSidebar(
       updateGroup(draft, group.id, { hidden: !group.hidden });
     });
     if (!group.hidden && filter.kind === 'group' && filter.groupId === group.id) {
-      filter = ALL_FILTER;
+      filter = HOME_FILTER;
       options.onChange(filter);
     }
     render();
@@ -252,7 +302,7 @@ export function initSidebar(
         removeGroup(draft, group.id);
       });
       if (filter.kind === 'group' && filter.groupId === group.id) {
-        filter = ALL_FILTER;
+        filter = HOME_FILTER;
         options.onChange(filter);
       }
       render();
@@ -263,6 +313,7 @@ export function initSidebar(
     // 菜单永远出现在 Dock 右侧，不压在图标上；同时收起气泡，避免两层文字叠一起
     const dockRight = root.getBoundingClientRect().right;
     root.classList.add('is-menu-open');
+    hideDockTip();
     openContextMenu({
       x: Math.max(x, dockRight + 12),
       y,
@@ -306,33 +357,26 @@ export function initSidebar(
     if (filter.kind === 'group') {
       const target = groups.find((group) => group.id === filter.groupId);
       if (!target || target.hidden) {
-        filter = ALL_FILTER;
+        filter = HOME_FILTER;
         options.onChange(filter);
       }
     }
 
     const visibleGroups = groups.filter((group) => !group.hidden);
     const hiddenGroups = groups.filter((group) => group.hidden);
-    // 分组视图里看不到文件夹（文件夹只在「全部」出现），计数只算松散项，与所见一致
+    // 分组视图里看不到文件夹与内置应用（它们只在「未分组」首页出现），计数与所见一致
     const countOf = (groupId: string | null): number =>
       shortcuts.filter((item) => item.groupId === groupId && !item.folderId).length;
-    const looseCount = shortcuts.filter((item) => !item.folderId).length;
-    const allTileCount = looseCount + folders.length;
+    // 首页还包含文件夹（内置应用不算数，避免计数虚高）
+    const homeCount = countOf(null) + folders.length;
 
     const children: HTMLElement[] = [
       dockItem({
-        label: '全部',
-        meta: `${allTileCount} 个`,
-        icon: 'layers',
-        active: filter.kind === 'all',
-        onClick: () => pickFilter(ALL_FILTER),
-      }),
-      dockItem({
         label: '未分组',
-        meta: `${countOf(null)} 个`,
+        meta: `${homeCount} 个`,
         icon: 'inbox',
         active: filter.kind === 'ungrouped',
-        onClick: () => pickFilter(UNGROUPED_FILTER),
+        onClick: () => pickFilter(HOME_FILTER),
       }),
     ];
 
@@ -374,7 +418,18 @@ export function initSidebar(
       );
     }
 
+    hideDockTip();
     root.replaceChildren(...children);
+
+    // 内容超高时可滚动：两端渐隐由 is-at-start 区分；激活项滚进可视区
+    requestAnimationFrame(() => {
+      root.classList.toggle('is-overflow', root.scrollHeight > root.clientHeight + 2);
+      root.classList.toggle(
+        'is-at-start',
+        root.scrollTop <= 2 || !root.classList.contains('is-overflow'),
+      );
+      root.querySelector<HTMLElement>('.dock-item.is-active')?.scrollIntoView({ block: 'nearest' });
+    });
   }
 
   // 自动隐藏：鼠标贴到屏幕左边缘时滑出，离开一会儿再收回去
@@ -399,7 +454,63 @@ export function initSidebar(
   sensor.addEventListener('mouseleave', scheduleHide);
 
   attachMagnification(root);
+
+  // 滚动时维护两端渐隐的起始端标记
+  root.addEventListener('scroll', () => {
+    root.classList.toggle('is-at-start', root.scrollTop <= 2);
+  });
+
+  // 滚轮策略（需 preventDefault，必须非 passive）：
+  //   Dock 上        → 滚动 Dock 本身
+  //   网格可横向翻页  → 滚轮横向滚网格，滚到头再切分类
+  //   其余位置       → 直接切分类
+  // 触控板连续小 delta：累积过阈值再切，切完进入短冷却防连跳。
+  let wheelAccum = 0;
+  let wheelLastAt = 0;
+  let wheelCoolUntil = 0;
+  window.addEventListener(
+    'wheel',
+    (event) => {
+      if (ctx.getState().settings.minimal) return;
+      if (document.querySelector('.dialog-backdrop, .drawer-backdrop')) return;
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest('input, textarea, select, [contenteditable="true"]')) return;
+      if (target.closest('.dock')) return; // Dock 自己滚
+
+      // 网格翻页：只在还有横向余量时接管
+      const grid = target
+        .closest('.shortcuts-area')
+        ?.querySelector<HTMLElement>('.shortcut-grid:not(.is-empty)');
+      if (grid && grid.scrollWidth > grid.clientWidth + 4) {
+        const max = grid.scrollWidth - grid.clientWidth;
+        const before = grid.scrollLeft;
+        const atStart = before <= 0 && event.deltaY < 0;
+        const atEnd = before >= max - 1 && event.deltaY > 0;
+        if (!atStart && !atEnd) {
+          event.preventDefault();
+          grid.scrollLeft = Math.max(0, Math.min(max, before + event.deltaY));
+          grid.classList.toggle('is-at-start', grid.scrollLeft <= 2);
+          return;
+        }
+      }
+
+      const now = Date.now();
+      if (now - wheelLastAt > 240) wheelAccum = 0;
+      wheelLastAt = now;
+      if (now < wheelCoolUntil) return;
+
+      wheelAccum += event.deltaY;
+      if (Math.abs(wheelAccum) < 120) return;
+      const direction = wheelAccum > 0 ? 1 : -1;
+      wheelAccum = 0;
+      wheelCoolUntil = now + 520;
+      cycle(direction);
+    },
+    { passive: false },
+  );
+
   render();
 
-  return { render, getFilter: () => filter };
+  return { render, getFilter: () => filter, cycle };
 }

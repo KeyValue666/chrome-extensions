@@ -1,5 +1,5 @@
 import type { AppContext, SettingsSection } from '../shared/context';
-import { WALLPAPER_PRESETS } from '../shared/constants';
+import { ACCENT_PRESETS, WALLPAPER_PRESETS } from '../shared/constants';
 import { clearState } from '../shared/storage';
 import { createDefaultState, exportState, parseStateJson } from '../shared/state';
 import { el } from '../lib/dom';
@@ -144,6 +144,34 @@ export function createSettings(ctx: AppContext): SettingsHandle {
     const state = ctx.getState();
     const { settings } = state;
 
+    const accentSwatches = ACCENT_PRESETS.map((accent) => {
+      const active = settings.accentId === accent.id;
+      const swatch = el('button', {
+        class: `accent-swatch${active ? ' is-active' : ''}`,
+        title: accent.name,
+        attrs: {
+          type: 'button',
+          'aria-label': `强调色：${accent.name}`,
+          'aria-pressed': String(active),
+        },
+        on: {
+          click: () => {
+            ctx.update((draft) => {
+              draft.settings.accentId = accent.id;
+            });
+            void ctx.applyAppearance();
+            for (const node of accentSwatches) {
+              node.classList.toggle('is-active', node === swatch);
+              node.setAttribute('aria-pressed', String(node === swatch));
+            }
+          },
+        },
+      });
+      // 深浅两档色各画一半，让用户预判两种主题下的效果
+      swatch.style.background = `linear-gradient(135deg, ${accent.dark} 50%, ${accent.light} 50%)`;
+      return swatch;
+    });
+
     return section('appearance', [
       el('div', { class: 'row row-stacked' }, [
         el('span', { class: 'row-label', text: '主题' }),
@@ -162,6 +190,21 @@ export function createSettings(ctx: AppContext): SettingsHandle {
           },
         ),
       ]),
+      el('div', { class: 'row row-stacked' }, [
+        el('span', { class: 'row-label', text: '强调色' }),
+        el('div', { class: 'accent-grid' }, accentSwatches),
+      ]),
+      switchRow(
+        '农历与节日',
+        '在日期行显示农历、传统节日与公历节日',
+        settings.lunarEnabled,
+        (next) => {
+          ctx.update((draft) => {
+            draft.settings.lunarEnabled = next;
+          });
+          ctx.refreshAll();
+        },
+      ),
       switchRow('24 小时制', '关闭后显示 12 小时制（AM/PM）', settings.hour24, (next) => {
         ctx.update((draft) => {
           draft.settings.hour24 = next;
@@ -174,6 +217,19 @@ export function createSettings(ctx: AppContext): SettingsHandle {
         });
         ctx.refreshAll();
       }),
+      switchRow(
+        '搜索历史',
+        '搜索框下拉显示最近搜索，可单条删除',
+        settings.searchHistoryEnabled,
+        (next) => {
+          ctx.update((draft) => {
+            draft.settings.searchHistoryEnabled = next;
+            // 关掉就顺手清空，避免数据残留
+            if (!next) draft.searchHistory = [];
+          });
+          ctx.refreshAll();
+        },
+      ),
       switchRow('壁纸毛玻璃', '模糊背景，前景文字更易读', settings.blur, (next) => {
         ctx.update((draft) => {
           draft.settings.blur = next;
@@ -423,17 +479,24 @@ export function createSettings(ctx: AppContext): SettingsHandle {
     section('about', [
       el('div', { class: 'about-line' }, [
         el('span', { class: 'row-label', text: '版本' }),
-        el('span', { class: 'row-desc', text: '0.1.0' }),
+        el('span', { class: 'row-desc', text: '0.2.0' }),
       ]),
       el('p', { class: 'hint', text: '权限说明' }),
       el('ul', { class: 'permission-list' }, [
-        el('li', { text: 'storage：把快捷方式、待办、便签和设置保存在本机。' }),
+        el('li', { text: 'storage：把快捷方式、待办、便签、倒数日和设置保存在本机。' }),
         el('li', { text: 'favicon：读取本地图标缓存，显示快捷方式的网站图标。' }),
+        el('li', {
+          text: 'activeTab：只有你点扩展图标时才读取当前标签页的网址与标题，用来新增快捷方式。',
+        }),
       ]),
       el('p', { class: 'hint', text: 'XTab 不发起任何网络请求，不收集任何数据，无账号系统。' }),
       el('p', {
         class: 'hint',
-        text: '快捷键：/ 或 Ctrl/⌘+K 聚焦搜索框，Esc 退出极简模式或关闭弹窗。',
+        text: '在小工具栏点扩展图标，可以把当前网页一键存成快捷方式（可改名、选分组）。',
+      }),
+      el('p', {
+        class: 'hint',
+        text: '快捷键：/ 或 Ctrl/⌘+K 聚焦搜索框，数字键 1-9 打开对应快捷方式，Esc 退出极简模式或关闭弹窗。',
       }),
       el('p', {
         class: 'hint',

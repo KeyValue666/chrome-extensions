@@ -18,6 +18,8 @@ export type IconName =
   | 'inbox'
   | 'todo'
   | 'note'
+  | 'timer'
+  | 'flag'
   | 'external'
   | 'copy'
   | 'chevron-left'
@@ -109,6 +111,13 @@ const ICONS: Record<IconName, IconDef> = {
   },
   note: {
     paths: ['M6 3h8l5 5v13H6z', 'M14 3v5h5', 'M9.5 13h6', 'M9.5 17h4'],
+  },
+  timer: {
+    paths: ['M12 13.5V8.5', 'M9.5 2.5h5'],
+    circles: [{ cx: 12, cy: 13.5, r: 8 }],
+  },
+  flag: {
+    paths: ['M5.5 21.5V3.5', 'M5.5 4.5h11.5l-2.2 4 2.2 4H5.5'],
   },
   external: {
     paths: [

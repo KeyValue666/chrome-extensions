@@ -1,8 +1,9 @@
 import type { AppContext } from '../shared/context';
-import { SEARCH_ENGINES, findEngine } from '../shared/constants';
+import { MAX_SEARCH_HISTORY, SEARCH_ENGINES, findEngine } from '../shared/constants';
+import { clearSearchHistory, pushSearchHistory, removeSearchHistory } from '../shared/state';
 import { el } from '../lib/dom';
 import { createIcon } from '../lib/icons';
-import { resolveSearchInput } from '../lib/url';
+import { looksLikeUrl, resolveSearchInput } from '../lib/url';
 
 export interface SearchHandle {
   render(): void;
@@ -134,6 +135,129 @@ export function initSearch(ctx: AppContext): SearchHandle {
     attrs: { role: 'listbox', 'aria-label': '搜索引擎', hidden: true },
   });
 
+  /* ---------- 搜索历史（纯本地，最多 MAX_SEARCH_HISTORY 条） ---------- */
+
+  const suggest = el('div', {
+    class: 'search-suggest',
+    attrs: { role: 'listbox', 'aria-label': '最近搜索', hidden: true },
+  });
+
+  let suggestActive = -1;
+
+  const closeSuggest = (): void => {
+    suggest.hidden = true;
+    suggestActive = -1;
+  };
+
+  const openSuggest = (): void => {
+    const { searchHistory, settings } = ctx.getState();
+    if (!settings.searchHistoryEnabled || searchHistory.length === 0) {
+      closeSuggest();
+      return;
+    }
+    const query = input.value.trim().toLowerCase();
+    const items = query
+      ? searchHistory.filter((item) => item.toLowerCase().includes(query))
+      : searchHistory;
+
+    if (items.length === 0) {
+      closeSuggest();
+      return;
+    }
+
+    const buildRow = (text: string, index: number): HTMLElement => {
+      const row = el(
+        'button',
+        {
+          class: `suggest-item${index === suggestActive ? ' is-active' : ''}`,
+          attrs: { type: 'button', role: 'option', 'aria-label': `搜索 ${text}` },
+          on: {
+            click: () => {
+              input.value = text;
+              closeSuggest();
+              submitSearch(text);
+            },
+          },
+        },
+        [
+          el('span', { class: 'suggest-icon', attrs: { 'aria-hidden': 'true' } }, [
+            createIcon('search', 13),
+          ]),
+          el('span', { class: 'suggest-text', text: text }),
+          el(
+            'span',
+            {
+              class: 'suggest-remove',
+              title: '删除这条记录',
+              attrs: { type: 'button', role: 'button', 'aria-label': `删除 ${text}` },
+            },
+            [createIcon('close', 12)],
+          ),
+        ],
+      ) as HTMLButtonElement;
+
+      // 点删除不触发整行搜索
+      row.querySelector('.suggest-remove')?.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      row.querySelector('.suggest-remove')?.addEventListener('click', (event) => {
+        event.stopPropagation();
+        ctx.update((draft) => {
+          removeSearchHistory(draft, text);
+        });
+        openSuggest();
+      });
+      return row;
+    };
+
+    const header = el('div', { class: 'suggest-header' }, [
+      el('span', { class: 'suggest-title', text: '最近搜索' }),
+      el(
+        'button',
+        {
+          class: 'link-button',
+          attrs: { type: 'button' },
+          on: {
+            click: () => {
+              ctx.update((draft) => {
+                clearSearchHistory(draft);
+              });
+              closeSuggest();
+            },
+          },
+        },
+        ['清空'],
+      ),
+    ]);
+
+    suggestActive = -1;
+    suggest.replaceChildren(header, ...items.slice(0, MAX_SEARCH_HISTORY).map(buildRow));
+    suggest.hidden = false;
+  };
+
+  /** 下拉键盘导航：返回 true 表示已消费按键 */
+  const handleSuggestKeys = (event: KeyboardEvent): boolean => {
+    if (suggest.hidden) return false;
+    const rows = [...suggest.querySelectorAll<HTMLButtonElement>('.suggest-item')];
+    if (rows.length === 0) return false;
+
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      const delta = event.key === 'ArrowDown' ? 1 : -1;
+      suggestActive = (suggestActive + delta + rows.length) % rows.length;
+      rows.forEach((row, index) => row.classList.toggle('is-active', index === suggestActive));
+      return true;
+    }
+    if (event.key === 'Enter' && suggestActive >= 0) {
+      event.preventDefault();
+      rows[suggestActive]?.click();
+      return true;
+    }
+    return false;
+  };
+
+  /* ---------- 引擎菜单 ---------- */
   const closeMenu = (): void => {
     menu.hidden = true;
     engineButton.setAttribute('aria-expanded', 'false');
@@ -194,23 +318,51 @@ export function initSearch(ctx: AppContext): SearchHandle {
     input,
     engineButton,
     menu,
+    suggest,
   ]);
 
-  form.addEventListener('submit', (event) => {
-    event.preventDefault();
+  /** 真正执行跳转；像网址的输入不记入搜索历史 */
+  const submitSearch = (raw: string): void => {
     const engine = findEngine(ctx.getState().settings.searchEngine);
-    const target = resolveSearchInput(input.value, engine);
+    const target = resolveSearchInput(raw, engine);
     if (!target) {
       input.focus();
       return;
     }
+    if (!looksLikeUrl(raw.trim())) {
+      ctx.update((draft) => {
+        pushSearchHistory(draft, raw);
+      });
+    }
     // 新标签页本身就是空页面，直接在当前页跳转，不额外开标签
     window.location.assign(target);
+  };
+
+  form.addEventListener('submit', (event) => {
+    event.preventDefault();
+    closeSuggest();
+    submitSearch(input.value);
+  });
+
+  input.addEventListener('input', () => {
+    if (input.value.trim()) openSuggest();
+    else closeSuggest();
+  });
+
+  input.addEventListener('focus', openSuggest);
+  input.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !suggest.hidden) {
+      event.stopPropagation();
+      closeSuggest();
+      return;
+    }
+    handleSuggestKeys(event);
   });
 
   document.addEventListener('mousedown', (event) => {
-    if (menu.hidden) return;
-    if (!form.contains(event.target as Node)) closeMenu();
+    const targetNode = event.target as Node;
+    if (!menu.hidden && !form.contains(targetNode)) closeMenu();
+    if (!suggest.hidden && !form.contains(targetNode)) closeSuggest();
   });
 
   root.append(form);
@@ -220,6 +372,7 @@ export function initSearch(ctx: AppContext): SearchHandle {
     render: () => {
       syncEngines();
       closeMenu();
+      closeSuggest();
     },
     focus: () => {
       input.focus();

@@ -1,9 +1,9 @@
 {
   "name": "xtab",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "XTab — 离线可用的新标签页：时钟、聚合搜索、快捷方式、壁纸、待办与便签",
+  "description": "XTab — 离线可用的新标签页：时钟、聚合搜索、快捷方式、壁纸、待办、便签、番茄钟与倒数日",
   "scripts": {
     "dev": "vite build --watch --mode development",
     "dev:ui": "vite --port 5174 --strictPort",

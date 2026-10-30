@@ -149,6 +149,16 @@
   padding: 20px 14px 10px 22px;
 }
 
+/* 抽屉打开时工具条浮在抽屉之上：两个按钮随时可点，点另一个直接切到对应分区，
+   而不是被抽屉盖住「点了没反应」；标题栏右侧让出工具条宽度，避免关闭按钮被压住 */
+body.is-drawer-open .toolbar {
+  z-index: 31;
+}
+
+body.is-drawer-open .drawer-header {
+  padding-right: 108px;
+}
+
 .drawer-title {
   margin: 0;
   font-size: 15px;
@@ -302,6 +312,37 @@
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.16);
 }
 
+/* ---------- 强调色选择 ---------- */
+
+.accent-grid {
+  display: flex;
+  gap: 10px;
+}
+
+.accent-swatch {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-2) ease,
+    transform var(--dur-2) var(--ease-out),
+    box-shadow var(--dur-2) ease;
+}
+
+.accent-swatch:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-1);
+}
+
+.accent-swatch.is-active {
+  border-color: var(--text);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 /* ==========================================================================
    壁纸选择
    ========================================================================== */
@@ -427,6 +468,13 @@
 
 .dialog-backdrop.is-open {
   opacity: 1;
+}
+
+/* 渐隐中的遮罩不再吃点击：关闭后 200ms 内点页面任意位置（尤其右上角工具条）
+   否则会被这块透明遮罩吞掉，表现为「按钮偶发点不动」 */
+.dialog-backdrop:not(.is-open),
+.drawer-backdrop:not(.is-open) {
+  pointer-events: none;
 }
 
 .dialog {
@@ -574,6 +622,148 @@ select.field-input {
   background-repeat: no-repeat;
   padding-right: 32px;
   cursor: pointer;
+}
+
+/* ---------- 分组选择器（替代原生 select） ---------- */
+
+.group-picker {
+  position: relative;
+}
+
+.group-picker-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 38px;
+  padding: 0 12px 0 7px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-2) ease,
+    box-shadow var(--dur-2) ease,
+    background var(--dur-2) ease;
+}
+
+.group-picker-button:hover {
+  background: var(--surface-hover);
+}
+
+.group-picker-button[aria-expanded='true'] {
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.group-picker-button .caret {
+  flex: none;
+}
+
+.group-picker-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.group-picker-icon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--surface-hover);
+  color: var(--text-2);
+}
+
+.group-picker-icon.has-tint {
+  background: var(--tile-bg);
+  color: #fff;
+}
+
+.group-picker-menu {
+  position: fixed;
+  z-index: 70;
+  max-height: 248px;
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--stroke);
+  border-radius: var(--radius-md);
+  background: var(--panel-solid);
+  backdrop-filter: blur(30px) saturate(1.4);
+  box-shadow: var(--shadow-2);
+  transform-origin: top left;
+  animation: pop-in var(--dur-2) var(--ease-out) both;
+}
+
+.group-picker-menu[hidden] {
+  display: none;
+}
+
+.group-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background var(--dur-1) ease,
+    color var(--dur-1) ease;
+}
+
+.group-picker-option:hover,
+.group-picker-option.is-focused {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.group-picker-option.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.group-picker-option .group-picker-name {
+  flex: 1;
+}
+
+.group-picker-check {
+  display: grid;
+  flex: none;
+  place-items: center;
+  opacity: 0;
+  transition: opacity var(--dur-1) ease;
+}
+
+.group-picker-option.is-active .group-picker-check {
+  opacity: 1;
+}
+
+.group-picker-menu::-webkit-scrollbar {
+  width: 6px;
+}
+
+.group-picker-menu::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: var(--stroke-strong);
+}
+
+.group-picker-menu::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .group-preview {

@@ -25,6 +25,49 @@ export function formatClock(date: Date, options: ClockOptions): string {
   return `${body} ${suffix}`;
 }
 
+/** 解析 YYYY-MM-DD 为本地时区的当天 0 点；非法格式返回 null */
+export function parseDateKey(value: string): Date | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+  // 2 月 30 日这类输入会被 Date 进位到 3 月，回读校验挡掉
+  if (date.getMonth() !== Number(match[2]) - 1 || date.getDate() !== Number(match[3])) return null;
+  return date;
+}
+
+/** 本地时区当天 0 点 */
+export function startOfToday(now: Date = new Date()): Date {
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+}
+
+/** 距目标日期还有几天（当天为 0，已过为负数）；目标按本地时区 0 点计 */
+export function daysUntil(dateKey: string, now: Date = new Date()): number | null {
+  const target = parseDateKey(dateKey);
+  if (!target) return null;
+  const diff = target.getTime() - startOfToday(now).getTime();
+  return Math.round(diff / 86_400_000);
+}
+
+/** 年度纪念日的下一次发生日（闰日 2/29 在平年按 2/28 兜底） */
+export function nextOccurrence(dateKey: string, now: Date = new Date()): Date | null {
+  const parsed = parseDateKey(dateKey);
+  if (!parsed) return null;
+  const today = startOfToday(now);
+  const day = parsed.getMonth() === 1 && parsed.getDate() === 29 ? 28 : parsed.getDate();
+  for (let year = today.getFullYear(); year <= today.getFullYear() + 1; year += 1) {
+    const candidate = new Date(year, parsed.getMonth(), day);
+    if (candidate >= today) return candidate;
+  }
+  return null;
+}
+
+/** 日期转 YYYY-MM-DD（本地时区），供 date input 默认值使用 */
+export function formatDateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
+    date.getDate(),
+  ).padStart(2, '0')}`;
+}
+
 /** 形如「10月29日 星期四」 */
 export function formatDate(date: Date): string {
   return `${date.getMonth() + 1}月${date.getDate()}日 ${WEEKDAYS[date.getDay()]}`;

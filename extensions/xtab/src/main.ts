@@ -4,6 +4,7 @@ import './styles/widgets.css';
 import './styles/settings.css';
 
 import { debounce, el } from './lib/dom';
+import { initialFilter } from './shared/state';
 import { loadState, saveState } from './shared/storage';
 import type { AppContext } from './shared/context';
 import type { AppState } from './shared/types';
@@ -66,6 +67,20 @@ function bindGlobalKeys(state: AppState, ctx: AppContext, widgets: Widgets): voi
       return;
     }
 
+    // 数字键 1-9 直接打开网格里对应的快捷方式（仅正常视图、非输入状态）
+    if (
+      /^[1-9]$/.test(event.key) &&
+      !typing &&
+      !event.ctrlKey &&
+      !event.metaKey &&
+      !event.altKey &&
+      !state.settings.minimal &&
+      !document.querySelector('.dialog-backdrop') &&
+      !document.querySelector('.shortcut-grid.is-editing')
+    ) {
+      if (widgets.shortcuts?.quickOpen(Number(event.key) - 1)) return;
+    }
+
     if (event.key === 'Escape') {
       // 弹窗自己处理 Esc；仅在没有弹窗时退出极简模式
       if (document.querySelector('.dialog-backdrop')) return;
@@ -85,17 +100,25 @@ async function bootstrap(): Promise<void> {
   let sidebar: SidebarHandle | null = null;
   let toolbar: ToolbarHandle | null = null;
 
+  // 有未落盘的本地改动时，别用外部数据覆盖内存里的状态
+  let dirty = false;
+
   const persist = debounce(() => {
-    void saveState(state).catch((error: unknown) => {
-      console.error('[xtab] 保存失败', error);
-      notify('保存失败，请检查浏览器存储空间');
-    });
+    void saveState(state)
+      .then(() => {
+        dirty = false;
+      })
+      .catch((error: unknown) => {
+        console.error('[xtab] 保存失败', error);
+        notify('保存失败，请检查浏览器存储空间');
+      });
   }, 300);
 
   const ctx: AppContext = {
     getState: () => state,
     update: (mutator) => {
       mutator(state);
+      dirty = true;
       persist();
     },
     applyAppearance: () => applyAppearance(state),
@@ -110,6 +133,32 @@ async function bootstrap(): Promise<void> {
     notify,
   };
 
+  /**
+   * 扩展图标面板会把当前网页直接写进同一份存储。
+   * 回到本页（切标签页、从弹窗回来）时比对一次，有外部改动就整页刷新数据，
+   * 否则会看到旧列表，以为没存上。
+   */
+  const syncExternalWrites = async (): Promise<void> => {
+    if (dirty) return;
+    if (document.querySelector('.dialog-backdrop, .drawer-backdrop')) return;
+    const active = document.activeElement;
+    if (active?.closest('input, textarea, [contenteditable="true"]')) return;
+
+    try {
+      const fresh = await loadState();
+      if (JSON.stringify(fresh) === JSON.stringify(state)) return;
+      Object.assign(state, fresh);
+      await applyAppearance(state);
+      ctx.refreshAll();
+    } catch (error) {
+      console.warn('[xtab] 同步外部改动失败', error);
+    }
+  };
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') void syncExternalWrites();
+  });
+
   // 先铺背景与主题，避免首屏出现纯色闪白
   await applyAppearance(state);
 
@@ -117,12 +166,22 @@ async function bootstrap(): Promise<void> {
 
   widgets.clock = initClock(ctx);
   widgets.search = initSearch(ctx);
-  widgets.shortcuts = initShortcuts(requireElement('shortcuts'), ctx, {
-    openTodo: () => panels.openTodo(),
-    openNote: () => panels.openNote(),
-  });
+  const firstFilter = initialFilter(state);
+  widgets.shortcuts = initShortcuts(
+    requireElement('shortcuts'),
+    ctx,
+    {
+      openTodo: () => panels.openTodo(),
+      openNote: () => panels.openNote(),
+      openPomodoro: () => panels.openPomodoro(),
+      openCountdown: () => panels.openCountdown(),
+      countdownBadge: () => panels.countdown.nextDays(),
+    },
+    { initialFilter: firstFilter },
+  );
   sidebar = initSidebar(requireElement('sidebar'), ctx, {
-    onChange: (filter) => widgets.shortcuts?.setFilter(filter),
+    initialFilter: firstFilter,
+    onChange: (filter, direction) => widgets.shortcuts?.setFilter(filter, direction),
   });
   toolbar = initToolbar(requireElement('toolbar'), ctx);
   settings = createSettings(ctx);

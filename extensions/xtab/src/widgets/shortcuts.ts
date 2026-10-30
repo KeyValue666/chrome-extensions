@@ -7,6 +7,7 @@ import {
   folderTokenId,
   isFolderToken,
   removeShortcut,
+  removeTokens,
   removeFromFolder,
   renameFolder,
   reorderGrid,
@@ -21,17 +22,24 @@ import type { Folder, Shortcut, ShortcutFilter } from '../shared/types';
 
 export interface ShortcutsHandle {
   render(): void;
-  setFilter(filter: ShortcutFilter): void;
+  /** direction：切换来源的方向，用于入场动画的方向感（1=下一个，-1=上一个） */
+  setFilter(filter: ShortcutFilter, direction?: -1 | 0 | 1): void;
   getFilter(): ShortcutFilter;
+  /** 打开当前筛选视图里第 n 个（0 起）快捷方式；用于数字键 1-9 快速打开 */
+  quickOpen(index: number): boolean;
 }
 
-/** 待办 / 便签是「内置应用」，和网站图标排在同一个网格里，点击后以弹窗呈现 */
+/** 待办 / 便签等「内置应用」，和网站图标排在同一个网格里，点击后以弹窗呈现 */
 export interface ShortcutsActions {
   openTodo(): void;
   openNote(): void;
+  openPomodoro(): void;
+  openCountdown(): void;
+  /** 最近一个倒数日的剩余天数，无条目返回 null（角标用） */
+  countdownBadge(): number | null;
 }
 
-const ALL_FILTER: ShortcutFilter = { kind: 'all', groupId: null };
+const HOME_FILTER: ShortcutFilter = { kind: 'ungrouped', groupId: null };
 
 interface GridEntry {
   token: string;
@@ -52,10 +60,15 @@ export function initShortcuts(
   root: HTMLElement,
   ctx: AppContext,
   actions: ShortcutsActions,
+  options: { initialFilter?: ShortcutFilter } = {},
 ): ShortcutsHandle {
-  let filter: ShortcutFilter = ALL_FILTER;
+  let filter: ShortcutFilter = options.initialFilter ?? HOME_FILTER;
   let editing = false;
+  /** 编辑模式下已选中的网格项（快捷方式 id 或文件夹 token） */
+  const selected = new Set<string>();
   let lastKey = '';
+  // 最近一次筛选切换的方向：-1 上一个 / 1 下一个 / 0 普通刷新
+  let pendingDirection: -1 | 0 | 1 = 0;
 
   // 拖拽与合并状态
   let draggingToken: string | null = null;
@@ -88,9 +101,13 @@ export function initShortcuts(
       }
     }
 
-    if (filter.kind === 'all') return entries;
-    const groupId = filter.kind === 'ungrouped' ? null : filter.groupId;
-    return entries.filter((entry) => entry.shortcut?.groupId === groupId);
+    // 首页（未分组）里文件夹和未分组快捷方式一起显示；分组视图只列组内快捷方式
+    if (filter.kind === 'ungrouped') {
+      return entries.filter((entry) =>
+        entry.kind === 'folder' ? true : entry.shortcut?.groupId === null,
+      );
+    }
+    return entries.filter((entry) => entry.shortcut?.groupId === filter.groupId);
   };
 
   const openCreate = (): void => {
@@ -177,7 +194,7 @@ export function initShortcuts(
   const buildAppTile = (
     label: string,
     icon: IconName,
-    variant: 'todo' | 'note',
+    variant: 'todo' | 'note' | 'pomodoro' | 'countdown',
     badge: number,
     onOpen: () => void,
   ): HTMLElement => {
@@ -337,7 +354,7 @@ export function initShortcuts(
     const tile = el(
       'div',
       {
-        class: 'shortcut',
+        class: `shortcut${selected.has(entry.token) ? ' is-selected' : ''}`,
         dataset: { id: shortcut.id, token: entry.token },
         attrs: {
           role: 'link',
@@ -358,7 +375,12 @@ export function initShortcuts(
     }
 
     const go = (): void => {
-      if (editing || movedDuringDrag) return;
+      if (movedDuringDrag) return;
+      // 编辑模式下点击是「选中 / 取消选中」，不跳转
+      if (editing) {
+        toggleSelect(entry.token);
+        return;
+      }
       window.location.assign(shortcut.url);
     };
 
@@ -416,7 +438,7 @@ export function initShortcuts(
     const tile = el(
       'div',
       {
-        class: 'shortcut shortcut-folder',
+        class: `shortcut shortcut-folder${selected.has(entry.token) ? ' is-selected' : ''}`,
         dataset: { token: entry.token },
         attrs: {
           role: 'button',
@@ -436,7 +458,11 @@ export function initShortcuts(
     }
 
     const open = (): void => {
-      if (editing || movedDuringDrag) return;
+      if (movedDuringDrag) return;
+      if (editing) {
+        toggleSelect(entry.token);
+        return;
+      }
       openFolder(folder.id);
     };
 
@@ -536,13 +562,109 @@ export function initShortcuts(
   const enterEdit = (): void => {
     if (editing) return;
     editing = true;
+    selected.clear();
     render();
   };
 
   const exitEdit = (): void => {
     if (!editing) return;
     editing = false;
+    selected.clear();
     render();
+  };
+
+  const toggleSelect = (token: string): void => {
+    if (selected.has(token)) selected.delete(token);
+    else selected.add(token);
+    renderEditBar();
+    currentGrid
+      ?.querySelector(`.shortcut[data-token="${CSS.escape(token)}"]`)
+      ?.classList.toggle('is-selected', selected.has(token));
+  };
+
+  /** 当前视图里可选中的项（快捷方式 + 文件夹），全选与计数都以它为准 */
+  const selectableTokens = (): string[] =>
+    [...(currentGrid?.querySelectorAll<HTMLElement>('.shortcut[data-token]') ?? [])]
+      .map((node) => node.dataset.token ?? '')
+      .filter(Boolean);
+
+  const selectAll = (): void => {
+    const tokens = selectableTokens();
+    const all = tokens.every((token) => selected.has(token));
+    selected.clear();
+    if (!all) for (const token of tokens) selected.add(token);
+    render();
+  };
+
+  const deleteSelected = (): void => {
+    const tokens = [...selected];
+    if (tokens.length === 0) return;
+    const folderCount = tokens.filter((token) => isFolderToken(token)).length;
+    void (async () => {
+      const ok = await confirmDialog({
+        title: '删除所选',
+        message:
+          folderCount > 0
+            ? `确定删除选中的 ${tokens.length} 项吗？其中的文件夹会被解散，成员回到网格。`
+            : `确定删除选中的 ${tokens.length} 个快捷方式吗？`,
+        confirmText: '删除',
+        danger: true,
+      });
+      if (!ok) return;
+      ctx.update((draft) => {
+        removeTokens(draft, tokens);
+      });
+      ctx.refreshAll();
+    })();
+  };
+
+  /** 编辑模式顶部的操作条：选中计数 + 全选 / 删除 / 完成 */
+  let editBarCount: HTMLElement | null = null;
+  let editBarDelete: HTMLButtonElement | null = null;
+  let editBarSelectAll: HTMLButtonElement | null = null;
+
+  const renderEditBar = (): void => {
+    if (!editBarCount || !editBarDelete || !editBarSelectAll) return;
+    const count = selected.size;
+    editBarCount.textContent = count === 0 ? '点图标可多选，拖拽可排序' : `已选 ${count} 项`;
+    editBarCount.classList.toggle('is-empty', count === 0);
+    editBarDelete.disabled = count === 0;
+    editBarDelete.textContent = count === 0 ? '删除' : `删除 ${count} 项`;
+    const tokens = selectableTokens();
+    editBarSelectAll.textContent =
+      tokens.length > 0 && tokens.every((t) => selected.has(t)) ? '取消全选' : '全选';
+  };
+
+  const buildEditBar = (): HTMLElement => {
+    editBarCount = el('span', { class: 'edit-bar-count' });
+    editBarDelete = el('button', {
+      class: 'button button-danger-ghost',
+      text: '删除',
+      attrs: { type: 'button' },
+      on: { click: deleteSelected },
+    }) as HTMLButtonElement;
+    editBarSelectAll = el('button', {
+      class: 'button button-ghost',
+      text: '全选',
+      attrs: { type: 'button' },
+      on: { click: selectAll },
+    }) as HTMLButtonElement;
+
+    const bar = el('div', { class: 'edit-bar', attrs: { role: 'toolbar' } }, [
+      editBarCount,
+      el('div', { class: 'edit-bar-actions' }, [
+        editBarSelectAll,
+        editBarDelete,
+        el('button', {
+          class: 'button button-primary',
+          text: '完成',
+          attrs: { type: 'button' },
+          on: { click: exitEdit },
+        }),
+      ]),
+    ]);
+    requestAnimationFrame(renderEditBar);
+    return bar;
   };
 
   document.addEventListener(
@@ -551,39 +673,101 @@ export function initShortcuts(
       if (event.key !== 'Escape' || !editing) return;
       if (document.querySelector('.dialog-backdrop')) return;
       event.stopPropagation();
+      // 先清空选中，再按一次才退出编辑
+      if (selected.size > 0) {
+        selected.clear();
+        render();
+        return;
+      }
       exitEdit();
     },
     true,
   );
 
-  // 点网格空白或页面其它区域退出编辑；点图标 / 角标 / 弹窗不退出
+  // 编辑模式下 Delete / Backspace 删除所选，Ctrl/⌘+A 全选
+  document.addEventListener(
+    'keydown',
+    (event) => {
+      if (!editing) return;
+      if (document.querySelector('.dialog-backdrop')) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, [contenteditable="true"]')) return;
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selected.size > 0) {
+        event.preventDefault();
+        deleteSelected();
+        return;
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
+        event.preventDefault();
+        selectAll();
+      }
+    },
+    true,
+  );
+
+  // 点网格空白或页面其它区域退出编辑；点图标 / 角标 / 操作条 / 弹窗不退出
   document.addEventListener(
     'pointerdown',
     (event) => {
       if (!editing) return;
       const target = event.target as HTMLElement | null;
       if (!target) return;
-      if (target.closest('.shortcut') || target.closest('.dialog-backdrop')) return;
+      if (
+        target.closest('.shortcut') ||
+        target.closest('.edit-bar') ||
+        target.closest('.dialog-backdrop')
+      ) {
+        return;
+      }
       exitEdit();
     },
     true,
   );
 
+  /** 布局模式：一屏放得下 → 行优先（从左往右排），少图标不再拉成一条竖列；
+      行优先纵向装不下 → 切回列优先做横向分页 */
+  const syncGridMode = (grid: HTMLElement): void => {
+    grid.classList.add('is-row-major');
+    if (grid.scrollHeight > grid.clientHeight + 4) grid.classList.remove('is-row-major');
+    grid.classList.toggle('has-overflow', grid.scrollWidth > grid.clientWidth + 4);
+    grid.classList.toggle('is-at-start', grid.scrollLeft <= 2);
+  };
+
+  // 窗口尺寸变化后重新决定流向与溢出提示
+  let resizeRaf = 0;
+  window.addEventListener('resize', () => {
+    cancelAnimationFrame(resizeRaf);
+    resizeRaf = requestAnimationFrame(() => {
+      if (currentGrid?.isConnected && !currentGrid.classList.contains('is-empty')) {
+        syncGridMode(currentGrid);
+      }
+    });
+  });
+
   function render(): void {
     const state = ctx.getState();
     if (filter.kind === 'group' && !state.groups.some((group) => group.id === filter.groupId)) {
-      filter = ALL_FILTER;
+      filter = HOME_FILTER;
     }
 
     const entries = visibleEntries();
-    const grid = el('div', { class: `shortcut-grid${editing ? ' is-editing' : ''}` });
+    const empty = entries.length === 0;
+    const grid = el('div', {
+      class: `shortcut-grid${editing ? ' is-editing' : ''}${empty ? ' is-empty' : ''}`,
+    });
     currentGrid = grid;
 
-    const remaining = state.todos.filter((todo) => !todo.done).length;
-    grid.append(
-      buildAppTile('待办', 'todo', 'todo', remaining, actions.openTodo),
-      buildAppTile('便签', 'note', 'note', 0, actions.openNote),
-    );
+    // 内置应用（待办/便签/专注/倒数日）只放在「未分组」首页，分组视图保持纯粹
+    if (filter.kind === 'ungrouped') {
+      const remaining = state.todos.filter((todo) => !todo.done).length;
+      const countdownBadge = actions.countdownBadge() ?? 0;
+      grid.append(
+        buildAppTile('待办', 'todo', 'todo', remaining, actions.openTodo),
+        buildAppTile('便签', 'note', 'note', 0, actions.openNote),
+        buildAppTile('专注', 'timer', 'pomodoro', 0, actions.openPomodoro),
+        buildAppTile('倒数日', 'flag', 'countdown', countdownBadge, actions.openCountdown),
+      );
+    }
 
     entries.forEach((entry, index) => {
       const tile = entry.kind === 'shortcut' ? buildShortcutTile(entry) : buildFolderTile(entry);
@@ -591,7 +775,7 @@ export function initShortcuts(
       grid.append(tile);
     });
 
-    if (entries.length === 0) {
+    if (empty) {
       grid.append(
         el('div', { class: 'shortcuts-empty' }, [
           el('span', { class: 'shortcuts-empty-icon' }, [createIcon('plus', 20)]),
@@ -621,10 +805,18 @@ export function initShortcuts(
       );
     }
 
-    // 拖拽：悬停另一个图标中心 → 合并预览；边缘 → 排序
+    // 拖拽：悬停另一个图标中心 → 合并预览；边缘 → 排序；靠左右边缘 → 自动横滚
     grid.addEventListener('dragover', (event) => {
       if (!draggingToken) return;
       event.preventDefault();
+
+      // 内容横向溢出时，把图标拖近边缘自动滚动网格
+      const bounds = grid.getBoundingClientRect();
+      if (grid.scrollWidth > grid.clientWidth + 4) {
+        if (event.clientX < bounds.left + 48) grid.scrollLeft -= 14;
+        else if (event.clientX > bounds.right - 48) grid.scrollLeft += 14;
+      }
+
       const dragging = grid.querySelector<HTMLElement>(
         `.shortcut[data-token="${CSS.escape(draggingToken)}"]`,
       );
@@ -669,19 +861,43 @@ export function initShortcuts(
       .join(',')}`;
     const animate = key !== lastKey;
     lastKey = key;
-    if (animate) grid.classList.add('is-entering');
+    if (animate) {
+      grid.classList.add('is-entering');
+      if (pendingDirection === 1) grid.classList.add('is-from-right');
+      else if (pendingDirection === -1) grid.classList.add('is-from-left');
+    }
+    pendingDirection = 0;
 
-    root.replaceChildren(grid);
+    root.replaceChildren(...(editing ? [buildEditBar()] : []), grid);
+
+    // 首帧绘制前决定流向（rAF 在 paint 前执行，不会闪）；
+    // 横向溢出时右侧渐隐提示；滚到头由 wheel 处理器维护 is-at-start
+    if (!empty) {
+      requestAnimationFrame(() => syncGridMode(grid));
+      grid.addEventListener('scroll', () => {
+        grid.classList.toggle('is-at-start', grid.scrollLeft <= 2);
+      });
+    }
   }
 
   render();
 
   return {
     render,
-    setFilter: (next) => {
+    setFilter: (next, direction = 0) => {
       filter = next;
+      pendingDirection = direction;
       render();
     },
     getFilter: () => filter,
+    quickOpen: (index) => {
+      if (editing) return false;
+      const entry = visibleEntries()
+        .filter((item) => item.kind === 'shortcut' && item.shortcut)
+        .slice(index, index + 1)[0];
+      if (!entry?.shortcut) return false;
+      window.location.assign(entry.shortcut.url);
+      return true;
+    },
   };
 }

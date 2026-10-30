@@ -14,6 +14,38 @@ export const LIMITS = {
   noteLength: 20000,
   wallpaperBytes: 20 * 1024 * 1024,
   wallpaperMaxWidth: 2560,
+  searchQuery: 80,
+  countdownName: 24,
+} as const;
+
+/** 搜索历史条数上限 */
+export const MAX_SEARCH_HISTORY = 12;
+/** 倒数日条数上限 */
+export const MAX_COUNTDOWNS = 50;
+
+/**
+ * 强调色预设：dark/light 各给一档，保证两个主题下都有足够对比度。
+ * JS 只把对应值写进 --accent，派生色（accent-soft）由 CSS color-mix 生成。
+ */
+export const ACCENT_PRESETS: { id: string; name: string; dark: string; light: string }[] = [
+  { id: 'azure', name: '晴空', dark: '#6ea8ff', light: '#2f6fed' },
+  { id: 'violet', name: '鸢尾', dark: '#a78bfa', light: '#7c5cf0' },
+  { id: 'mint', name: '薄荷', dark: '#4fd1a5', light: '#0e9f6e' },
+  { id: 'sunset', name: '霞光', dark: '#ff9e6b', light: '#e8590c' },
+  { id: 'rose', name: '蔷薇', dark: '#f472b6', light: '#d6336c' },
+  { id: 'amber', name: '琥珀', dark: '#fbbf24', light: '#d97706' },
+];
+
+export const DEFAULT_ACCENT_ID = 'azure';
+
+export function findAccent(id: string): { id: string; name: string; dark: string; light: string } {
+  return ACCENT_PRESETS.find((accent) => accent.id === id) ?? ACCENT_PRESETS[0]!;
+}
+
+/** 番茄钟时长边界（分钟） */
+export const POMODORO_LIMITS = {
+  focus: { min: 5, max: 120, step: 5, default: 25 },
+  break: { min: 1, max: 30, step: 1, default: 5 },
 } as const;
 
 export const SEARCH_ENGINES: SearchEngine[] = [
@@ -133,6 +165,7 @@ export const DEFAULT_PRESET_ID = 'aether';
 
 export const DEFAULT_SETTINGS: Settings = {
   theme: 'auto',
+  accentId: DEFAULT_ACCENT_ID,
   wallpaperKind: 'preset',
   presetId: DEFAULT_PRESET_ID,
   blur: false,
@@ -142,6 +175,10 @@ export const DEFAULT_SETTINGS: Settings = {
   minimal: false,
   sidebarCollapsed: false,
   searchEngine: DEFAULT_ENGINE_ID,
+  lunarEnabled: true,
+  searchHistoryEnabled: true,
+  pomodoroFocus: POMODORO_LIMITS.focus.default,
+  pomodoroBreak: POMODORO_LIMITS.break.default,
 };
 
 export function findEngine(id: string): SearchEngine {
