@@ -14,8 +14,9 @@
   --font-mono: 'SF Mono', ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace;
 
   --text: rgba(255, 255, 255, 0.95);
+  --text-1: var(--text);
   --text-2: rgba(255, 255, 255, 0.66);
-  --text-3: rgba(255, 255, 255, 0.38);
+  --text-3: rgba(255, 255, 255, 0.5);
 
   --surface: rgba(255, 255, 255, 0.06);
   --surface-hover: rgba(255, 255, 255, 0.1);
@@ -30,14 +31,15 @@
   --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
   --accent-strong: color-mix(in srgb, var(--accent) 55%, transparent);
   --danger: #ff6b6b;
+  --ok: #4fd1a5;
 
   --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.18), 0 10px 30px rgba(0, 0, 0, 0.22);
   --shadow-2: 0 2px 6px rgba(0, 0, 0, 0.24), 0 24px 60px rgba(0, 0, 0, 0.36);
 
   --radius-xl: 24px;
-  --radius-lg: 18px;
-  --radius-md: 13px;
-  --radius-sm: 9px;
+  --radius-lg: 20px;
+  --radius-md: 14px;
+  --radius-sm: 8px;
 
   /* 动效：统一用同一条缓动曲线，快慢只改 duration */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -58,8 +60,9 @@
   color-scheme: light;
 
   --text: rgba(16, 18, 24, 0.95);
+  --text-1: var(--text);
   --text-2: rgba(16, 18, 24, 0.78);
-  --text-3: rgba(16, 18, 24, 0.46);
+  --text-3: rgba(16, 18, 24, 0.5);
 
   --surface: rgba(255, 255, 255, 0.6);
   --surface-hover: rgba(255, 255, 255, 0.78);
@@ -70,6 +73,7 @@
   --panel-solid: rgba(252, 252, 254, 0.97);
 
   --accent: #2f6fed;
+  --ok: #0e9f6e;
   --shadow-1: 0 1px 2px rgba(16, 18, 24, 0.06), 0 10px 30px rgba(16, 18, 24, 0.1);
   --shadow-2: 0 2px 8px rgba(16, 18, 24, 0.1), 0 24px 60px rgba(16, 18, 24, 0.16);
 
@@ -202,7 +206,7 @@ body.is-blurred .bg {
   flex: 1;
   flex-direction: column;
   min-height: 0;
-  gap: clamp(26px, 4.5vh, 46px);
+  gap: clamp(24px, 3.6vh, 36px);
   width: min(1040px, 100%);
   padding-top: clamp(36px, 7.5vh, 88px);
 }
@@ -211,9 +215,11 @@ body.is-blurred .bg {
 
 .hero {
   display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: clamp(24px, 4vw, 56px);
+  flex-direction: column;
+  align-items: center;
+  /* 规范 §2：时钟与搜索之间 24px（.content 的 32px 减去这 8px 负边距） */
+  gap: 0;
+  margin-bottom: -8px;
   animation: rise-in var(--dur-3) var(--ease-out) both;
   /* rise-in 的填充帧让 hero 带着层叠上下文；不抬高的话，
      搜索框下拉菜单（引擎/历史）会被后面网格里的图块盖住 */
@@ -225,16 +231,15 @@ body.is-blurred .bg {
    「移出→复位→移入」来回横跳（表现为数字抖动） */
 .clock-button {
   display: flex;
-  flex: none;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: center;
   gap: 10px;
-  padding: 2px 14px 6px 0;
+  padding: 2px 14px 6px;
   border: 0;
   border-radius: var(--radius-lg);
   background: none;
   color: inherit;
-  text-align: left;
+  text-align: center;
   cursor: pointer;
 }
 
@@ -251,11 +256,13 @@ body.is-blurred .bg {
   font-weight: 210;
   font-variant-numeric: tabular-nums;
   line-height: 1.06;
+  /* 阴影恒定：悬停若过渡 filter 会逐帧重排渐变裁剪文字，表现为文字抖动 */
   filter: drop-shadow(0 16px 40px rgba(0, 0, 0, 0.3));
   transition:
     font-size var(--dur-2) var(--ease-out),
-    transform var(--dur-2) var(--ease-out),
-    filter var(--dur-2) ease;
+    transform var(--dur-2) var(--ease-out);
+  /* 独立合成层：transform 动画走合成器，不重光栅化 clipped 文字 */
+  will-change: transform;
 }
 
 /* 渐变裁剪必须落在每个数字自身：放在父元素上会被 overflow/filter 组合渲染成乱字形 */
@@ -279,7 +286,6 @@ body.is-blurred .bg {
 
 .clock-button:hover .clock {
   transform: translateY(-3px);
-  filter: drop-shadow(0 20px 46px rgba(0, 0, 0, 0.36)) brightness(1.06);
 }
 
 /* 数字槽位：flex 布局下 letter-spacing 失效，用负 margin 收紧字距 */
@@ -334,13 +340,14 @@ body.is-blurred .bg {
 }
 
 .date {
-  max-width: 46vw;
+  max-width: 72vw;
   overflow: hidden;
   color: var(--text-2);
-  font-size: clamp(12.5px, 1.1vw, 14px);
-  font-weight: 450;
+  font-size: clamp(12px, 1.1vw, 14px);
+  font-weight: 400;
   letter-spacing: 0.06em;
   text-overflow: ellipsis;
+  text-align: center;
   white-space: nowrap;
   transition: color var(--dur-2) ease;
   animation: rise-in var(--dur-3) var(--ease-out) 90ms both;
@@ -354,9 +361,9 @@ body.is-blurred .bg {
 
 .search {
   display: flex;
-  justify-content: flex-end;
+  justify-content: center;
   width: min(560px, 100%);
-  margin-left: auto;
+  margin-inline: auto;
   animation: rise-in var(--dur-3) var(--ease-out) 140ms both;
 }
 
@@ -432,7 +439,7 @@ body.is-blurred .bg {
   background: var(--surface-hover);
   color: var(--text-2);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 12px;
   cursor: pointer;
   transition:
     color var(--dur-1) ease,
@@ -556,7 +563,7 @@ body.is-blurred .bg {
 }
 
 .engine-option.is-active .engine-option-name {
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* 搜索历史下拉：挂在搜索框内，与引擎菜单同层 */
@@ -760,27 +767,12 @@ body.is-minimal .app {
   padding-left: 0;
 }
 
-/* 极简模式回归居中构图：时钟在上、搜索在下 */
+/* 极简模式：结构同常规（时钟→搜索→空网格），仅收紧纵向节奏 */
 body.is-minimal .hero {
-  flex-direction: column;
-  align-items: center;
-  gap: clamp(20px, 3vh, 30px);
+  margin-bottom: 0;
 }
 
-body.is-minimal .clock-button {
-  align-items: center;
-  text-align: center;
-  padding-right: 14px;
-}
-
-body.is-minimal .date {
-  max-width: none;
-}
-
-body.is-minimal .search {
-  justify-content: center;
-  margin-left: 0;
-}
+/* 极简模式：基础布局已是居中，无需额外覆盖 */
 
 body.is-minimal .content {
   gap: 32px;

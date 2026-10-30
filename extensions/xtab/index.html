@@ -17,13 +17,15 @@
 
       <main class="stage">
         <div class="content">
+          <!-- 设计规范 §2：三层纵向结构——时钟锚点 → 居中搜索 → 网格 -->
           <section class="hero" id="hero">
             <button class="clock-button" id="clock-button" type="button" title="点击切换极简模式">
               <span class="clock" id="clock"></span>
               <span class="date" id="date"></span>
             </button>
-            <div class="search" id="search"></div>
           </section>
+
+          <section class="search" id="search" aria-label="搜索"></section>
 
           <section class="shortcuts-area" id="shortcuts" aria-label="快捷方式"></section>
         </div>

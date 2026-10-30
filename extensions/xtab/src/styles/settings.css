@@ -162,7 +162,7 @@ body.is-drawer-open .drawer-header {
 .drawer-title {
   margin: 0;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.01em;
 }
 
@@ -187,7 +187,7 @@ body.is-drawer-open .drawer-header {
   margin: 0 0 12px;
   color: var(--text-3);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -289,7 +289,7 @@ body.is-drawer-open .drawer-header {
   flex: 1;
   padding: 7px 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text-2);
   font: inherit;
@@ -308,7 +308,7 @@ body.is-drawer-open .drawer-header {
 .segment[aria-pressed='true'] {
   background: var(--surface-active);
   color: var(--text);
-  font-weight: 550;
+  font-weight: 500;
   box-shadow: 0 1px 6px rgba(0, 0, 0, 0.16);
 }
 
@@ -522,7 +522,7 @@ body.is-drawer-open .drawer-header {
 .dialog-title {
   margin: 0;
   font-size: 15px;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: 0.01em;
 }
 
@@ -678,7 +678,7 @@ select.field-input {
   place-items: center;
   width: 26px;
   height: 26px;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: var(--surface-hover);
   color: var(--text-2);
 }
@@ -714,7 +714,7 @@ select.field-input {
   width: 100%;
   padding: 7px 9px;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text-2);
   font: inherit;
@@ -790,7 +790,7 @@ select.field-input {
   aspect-ratio: 1;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--text-2);
   cursor: pointer;

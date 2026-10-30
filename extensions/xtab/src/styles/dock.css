@@ -91,7 +91,7 @@
   place-items: center;
   width: 40px;
   height: 40px;
-  border-radius: 13px;
+  border-radius: var(--radius-md);
   background: var(--tile-bg, var(--surface-hover));
   color: #fff;
   box-shadow:
@@ -156,7 +156,7 @@
   gap: 6px;
   padding: 6px 10px;
   border: 1px solid var(--stroke);
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--panel-solid);
   box-shadow: var(--shadow-1);
   color: var(--text);
@@ -186,7 +186,7 @@
 }
 
 .dock-tip-name {
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .dock-tip-meta {

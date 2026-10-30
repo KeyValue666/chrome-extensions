@@ -144,10 +144,10 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 54px;
-  height: 54px;
+  width: 56px;
+  height: 56px;
   border: 1px solid var(--stroke);
-  border-radius: 16px;
+  border-radius: var(--radius-md);
   background: var(--surface-hover);
   box-shadow: 0 5px 14px rgba(0, 0, 0, 0.14);
   transition:
@@ -159,7 +159,7 @@
 .shortcut-letter {
   color: var(--text-2);
   font-size: 19px;
-  font-weight: 560;
+  font-weight: 500;
   letter-spacing: -0.02em;
 }
 
@@ -186,7 +186,7 @@
   overflow: hidden;
   color: var(--text-2);
   font-size: 12px;
-  font-weight: 450;
+  font-weight: 400;
   line-height: 1.35;
   text-align: center;
   text-overflow: ellipsis;
@@ -251,10 +251,10 @@
   height: 18px;
   padding: 0 5px;
   border-radius: 999px;
-  background: #ff453a;
+  background: var(--danger);
   color: #fff;
   font-size: 10px;
-  font-weight: 650;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
   line-height: 18px;
   text-align: center;
@@ -450,7 +450,7 @@
 
 .tile-badge.is-del {
   left: -10px;
-  background: #ff453a;
+  background: var(--danger);
   color: #fff;
   box-shadow: 0 4px 10px rgba(255, 69, 58, 0.45);
 }
@@ -508,7 +508,7 @@
 .folder-mini-letter {
   color: var(--text-2);
   font-size: 9px;
-  font-weight: 600;
+  font-weight: 500;
   transition: opacity var(--dur-2) ease;
 }
 
@@ -588,7 +588,7 @@
   width: 48px;
   height: 48px;
   border: 1px solid var(--stroke);
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--surface-hover);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
   transition: transform var(--dur-2) var(--ease-spring);
@@ -667,7 +667,7 @@
   place-items: center;
   width: 44px;
   height: 44px;
-  border-radius: 14px;
+  border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--text-2);
 }
@@ -710,11 +710,11 @@
   width: 100%;
   padding: 8px 10px;
   border: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--text-2);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 12px;
   text-align: left;
   cursor: pointer;
   transition:
@@ -743,7 +743,7 @@
   overflow: hidden;
   border-bottom: 1px solid var(--stroke);
   color: var(--text-3);
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 500;
   letter-spacing: 0.01em;
   text-overflow: ellipsis;
@@ -793,7 +793,7 @@
   background: none;
   color: var(--text);
   font: inherit;
-  font-size: 13.5px;
+  font-size: 13px;
   outline: none;
 }
 
@@ -809,7 +809,7 @@
   height: 28px;
   padding: 0;
   border: 0;
-  border-radius: 9px;
+  border-radius: var(--radius-sm);
   background: var(--accent);
   color: #fff;
   cursor: pointer;
@@ -885,7 +885,7 @@
 .todo-text {
   flex: 1;
   overflow-wrap: anywhere;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.5;
   cursor: pointer;
   transition:
@@ -936,7 +936,7 @@
 
 .todo-count {
   color: var(--text-3);
-  font-size: 11.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
 }
 
@@ -973,7 +973,7 @@
 .note-status,
 .note-counter {
   color: var(--text-3);
-  font-size: 11.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   transition: opacity var(--dur-2) ease;
 }
@@ -987,7 +987,7 @@
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 13.5px;
+  font-size: 13px;
   line-height: 1.75;
   outline: none;
   resize: none;
@@ -1079,7 +1079,7 @@
 }
 
 body.is-pomodoro-break .pomodoro-ring-bar {
-  stroke: #4fd1a5;
+  stroke: var(--ok);
 }
 
 .pomodoro-center {
@@ -1097,13 +1097,13 @@ body.is-pomodoro-break .pomodoro-ring-bar {
 }
 
 body.is-pomodoro-break .pomodoro-phase {
-  color: #34b392;
+  color: var(--ok);
 }
 
 .pomodoro-time {
   color: var(--text);
   font-size: 44px;
-  font-weight: 250;
+  font-weight: 210;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
   line-height: 1;
@@ -1135,7 +1135,7 @@ body.is-pomodoro-break .pomodoro-phase {
   color: #fff;
   font: inherit;
   font-size: 13px;
-  font-weight: 550;
+  font-weight: 500;
   cursor: pointer;
   transition:
     transform var(--dur-1) var(--ease-out),
@@ -1176,7 +1176,7 @@ body.is-pomodoro-break .pomodoro-phase {
 .pomodoro-step-value {
   min-width: 62px;
   color: var(--text);
-  font-size: 12.5px;
+  font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
@@ -1207,7 +1207,7 @@ body.is-pomodoro-break .pomodoro-phase {
   border: 1px solid var(--stroke);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: 12.5px;
+  font-size: 12px;
 }
 
 .countdown-form .segment[aria-pressed='true'] {
@@ -1248,7 +1248,7 @@ body.is-pomodoro-break .pomodoro-phase {
 
 .countdown-name {
   overflow: hidden;
-  font-size: 13.5px;
+  font-size: 13px;
   font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1264,7 +1264,7 @@ body.is-pomodoro-break .pomodoro-phase {
   flex: none;
   color: var(--text-2);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
